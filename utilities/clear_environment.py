@@ -50,7 +50,6 @@ def main():
     :return:
     """
     delete_server('blog_app_1')
-    delete_security_group_rules_single_ip('default')
 
     delete_floating_ip(None)  # TODO - remove this faked call - see method for details...
 
@@ -111,34 +110,6 @@ def delete_floating_ip(server):
 
     print('deleting floating IP address %s' % floating_ip.floating_ip_address)
     conn.network.delete_ip(floating_ip)
-
-
-def delete_security_group_rules_single_ip(security_group_name):
-    """
-    Delete rules from the named security group, where the remote_ip_prefix references a single IP i.e. /32
-    :param security_group_name: The name of the security group from which to delete rules.
-    :return:
-    """
-    all_rules = conn.network.security_group_rules(
-        security_group_id=conn.network.find_security_group(security_group_name).id
-    )
-
-    # look at the remote_ip_prefix for each rule to see if it is a /32
-    single_ip_rules = [
-        x for x in all_rules if
-        isinstance(x.remote_ip_prefix, str) and
-        x.remote_ip_prefix.endswith('/32')  # TODO improve this - use a regex or something
-    ]
-
-    if not single_ip_rules:
-        print('could not find any single IP rules in security group %s' % security_group_name)
-        return
-
-    display('single IP rules for security group %s' % security_group_name, single_ip_rules)
-
-    print('deleting single IP rules for security group %s' % security_group_name)
-    for single_ip_rule in single_ip_rules:
-        conn.network.delete_security_group_rule(single_ip_rule)
 
 
 def delete_subnet(subnet_name, router_name):
