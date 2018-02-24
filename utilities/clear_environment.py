@@ -37,6 +37,7 @@ def display(label, data):
     :param data: The data to be displayed. Typically a single, or list of objects.
     :return:
     """
+    print()
     print(label)
     print('-' * len(label))
     pp.pprint(data)
@@ -44,18 +45,18 @@ def display(label, data):
 
 
 def main():
-    # display('routers', list(conn.network.routers()))
-    # display('router r1', conn.network.find_router('r1'))
-    # display('networks', list(conn.network.networks()))
-    # display('network net1', conn.network.find_network("net1"))
-    # display('subnets', list(conn.network.subnets()))
-    # display('subnet net1', conn.network.find_subnet("net1"))
-
+    """
+    Main function. Call the various delete methods in the correct order.
+    :return:
+    """
     delete_server('blog_app_1')
     delete_security_group_rules_single_ip('default')
 
     delete_floating_ip(None)  # TODO - remove this faked call - see method for details...
-    # delete_subnet('net1')
+
+    delete_subnet('net1', router_name='r1')
+    delete_network('net1')
+    delete_router('r1')
 
 
 def delete_server(server_name):
@@ -70,7 +71,7 @@ def delete_server(server_name):
         print('could not find server %s' % server_name)
         return
 
-    display('server', server)
+    display('server %s' % server_name, server)
 
     if server.status == 'ACTIVE':
         print('stopping server....')
@@ -118,30 +119,34 @@ def delete_security_group_rules_single_ip(security_group_name):
     :param security_group_name: The name of the security group from which to delete rules.
     :return:
     """
-    all_rules = list(conn.network.security_group_rules(
-        security_group_id=conn.network.find_security_group(security_group_name).id)
+    all_rules = conn.network.security_group_rules(
+        security_group_id=conn.network.find_security_group(security_group_name).id
     )
+
+    # look at the remote_ip_prefix for each rule to see if it is a /32
     single_ip_rules = [
         x for x in all_rules if
         isinstance(x.remote_ip_prefix, str) and
-        x.remote_ip_prefix.endswith('/32')
+        x.remote_ip_prefix.endswith('/32')  # TODO improve this - use a regex or something
     ]
 
     if not single_ip_rules:
-        print('could not find any single ip rules in security group %s' % security_group_name)
+        print('could not find any single IP rules in security group %s' % security_group_name)
         return
 
-    display('single ip rules', single_ip_rules)
+    display('single IP rules for security group %s' % security_group_name, single_ip_rules)
 
-    print('deleting rules')
+    print('deleting single IP rules for security group %s' % security_group_name)
     for single_ip_rule in single_ip_rules:
         conn.network.delete_security_group_rule(single_ip_rule)
 
 
-def delete_subnet(subnet_name):
+def delete_subnet(subnet_name, router_name):
     """
     Delete the named subnet.
+    In order to delete the subnet, it is necessary to first call delete_ports()
     :param subnet_name: The name of the subnet to delete.
+    :param router_name: The name of the related router.
     :return:
     """
     subnet = conn.network.find_subnet(subnet_name)
@@ -150,10 +155,85 @@ def delete_subnet(subnet_name):
         print('could not find subnet %s' % subnet_name)
         return
 
-    display('subnet', subnet)
+    display('subnet %s' % subnet_name, subnet)
+
+    router = conn.network.find_router(router_name)
+
+    if not router:
+        print('could not find router %s' % router_name)
+        return
+
+    delete_ports(subnet, router)
 
     print('deleting subnet %s' % subnet_name)
     conn.network.delete_subnet(subnet)
+
+
+def delete_ports(subnet, router):
+    """
+    Delete port(s) for a given subnet and router.
+    Note that in order to delete ports, it is necessary to first delete the related interfaces from the router.
+    :param subnet: The subnet for which the port is to be deleted.
+    :param router: The router to which the port(s) and subnet are attached.
+    :return:
+    """
+    all_ports = conn.network.ports()
+
+    # each port can have multiple fixed_ips, so need to look inside each one to examine the subnet
+    ports_on_required_subnet = [
+        port for port in all_ports if
+        [
+            fixed_ip for fixed_ip in port.fixed_ips if
+            fixed_ip['subnet_id'] == subnet.id
+        ]
+    ]
+
+    if not ports_on_required_subnet:
+        print('could not find any ports in the subnet %s' % subnet.name)
+        return
+
+    display('ports on subnet %s' % subnet.name, ports_on_required_subnet)
+
+    print('deleting ports on subnet %s' % subnet.name)
+    for port in ports_on_required_subnet:
+        conn.network.remove_interface_from_router(router, subnet.id, port.id)
+        conn.network.delete_port(port)
+
+
+def delete_network(network_name):
+    """
+    Delete the named network.
+    :param network_name: The name of the network to delete.
+    :return:
+    """
+    network = conn.network.find_network(network_name)
+
+    if not network:
+        print('could not find network %s' % network_name)
+        return
+
+    display('network %s' % network_name, network)
+
+    print('deleting network %s' % network_name)
+    conn.network.delete_network(network)
+
+
+def delete_router(router_name):
+    """
+    Delete the named router.
+    :param router_name: The name of the router to delete.
+    :return:
+    """
+    router = conn.network.find_router(router_name)
+
+    if not router:
+        print('could not find router %s' % router_name)
+        return
+
+    display('router %s' % router_name, router)
+
+    print('deleting router %s' % router_name)
+    conn.network.delete_router(router)
 
 
 if __name__ == '__main__':
