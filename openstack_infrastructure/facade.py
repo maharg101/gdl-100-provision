@@ -224,11 +224,12 @@ class OpenStackFacade(object):
         :param flavor_name: The name of the flavor to use. Defaults to m1.small.
         :return: The server, and its public IP address
         """
-        existing_server = self.conn.compute.find_server(server_name)
+        pre_existing_server = self.conn.compute.find_server(server_name)
     
-        if existing_server:
-            self.display('server %s found' % server_name, existing_server)
-            return existing_server
+        if pre_existing_server:
+            server = self.conn.compute.get_server(pre_existing_server.id)
+            self.display('server %s found' % server_name, server)
+            return server
     
         image = self.conn.compute.find_image(image_name)
         flavor = self.conn.compute.find_flavor(flavor_name)
@@ -244,11 +245,10 @@ class OpenStackFacade(object):
     
         server = self.conn.compute.create_server(**params)
         self.conn.compute.wait_for_server(server, status='ACTIVE')
-
-        floating_ip = self.assign_floating_ip(network, port, server, subnet)
-
-        self.display('server %s created' % server_name, server)
-        return server, floating_ip.floating_ip_address
+        self.assign_floating_ip(network, port, server, subnet)
+        created_server = self.conn.compute.get_server(server.id)
+        self.display('server %s created' % server_name, created_server)
+        return created_server
 
     def assign_floating_ip(self, network, port, server, subnet):
         """
@@ -316,22 +316,36 @@ class OpenStackFacade(object):
         :param network_name: The name of the network to which the server is attached.
         :return:
         """
+
+        floating_ips_for_this_server = self.get_public_addresses(server, network_name)
+
+        self.display('floating IP address(es)', floating_ips_for_this_server or 'None found')
+
+        if floating_ips_for_this_server:
+            for floating_ip in floating_ips_for_this_server:
+                self.display('deleting floating IP address %s' % floating_ip.floating_ip_address)
+                self.conn.network.delete_ip(floating_ip)
+
+    def get_public_addresses(self, server, network_name):
+        """
+        Return a list of public (floating IP) addresses for the given server on the named network.
+        :param server: The server for which to return the addresses.
+        :param network_name: The name of the network which the addresses are associated with.
+        :return: A list of floating IP objects, or None if none are present.
+        """
         try:
             fixed_address = server.addresses[network_name][0]['addr']
         except KeyError:
-            self.display('no floating IP found')
-            return
-
-        assert ipaddress.IPv4Address(fixed_address).is_private  # TODO - handle this properly
-
-        floating_ips = list(self.conn.network.ips())  # querying with fixed_ip_address=fixed_address seems to be broken ? .....
-        floating_ips_to_delete = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
-
-        self.display('floating IP address(es)', floating_ips_to_delete)
-
-        for floating_ip in floating_ips_to_delete:
-            self.display('deleting floating IP address %s' % floating_ip.floating_ip_address)
-            self.conn.network.delete_ip(floating_ip)
+            floating_ips_for_this_server = None
+        except TypeError:
+            floating_ips_for_this_server = None
+        else:
+            assert ipaddress.IPv4Address(fixed_address).is_private  # TODO - handle this properly
+            floating_ips = list(
+                self.conn.network.ips()  # querying with fixed_ip_address=fixed_address seems to be broken ? .....
+            )
+            floating_ips_for_this_server = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
+        return floating_ips_for_this_server
 
     def delete_subnet(self, subnet_name, router_name):
         """

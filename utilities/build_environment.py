@@ -35,8 +35,12 @@ def main():
     subnet = os_facade.find_or_create_subnet(SUBNET_NAME, network=network)
     port = os_facade.find_or_create_port(network, subnet)
     os_facade.add_interface_to_router(router, subnet, port)
-    _, public_ip_address = os_facade.find_or_create_server('blog_app_1', network, subnet, port)
-    print('server public ip address is %s' % public_ip_address)
+    server = os_facade.find_or_create_server(SERVER_NAME, network, subnet, port)
+    public_ip_addresses = os_facade.get_public_addresses(server, NETWORK_NAME)
+    if public_ip_addresses:
+        print('server public ip address(es): %s' % ','.join([x.floating_ip_address for x in public_ip_addresses]))
+    else:
+        print('There seems to have been a problem obtaining a public IP address.')
 
 
 if __name__ == '__main__':
