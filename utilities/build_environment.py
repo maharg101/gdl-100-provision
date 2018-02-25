@@ -12,7 +12,13 @@ Related links:
 import os
 import pprint
 
-from openstack import connection, exceptions
+from openstack import connection
+
+# starter environment naming
+SERVER_NAME = 'blog_app_1'
+NETWORK_NAME = 'net1'
+SUBNET_NAME = 'net1'
+ROUTER_NAME = 'r1'
 
 conn = connection.Connection(
     region_name=os.environ['OS_REGION_NAME'],
@@ -52,12 +58,13 @@ def main():
 
     :return:
     """
-    router = find_or_create_router('r1')
-    network = find_or_create_network('net1')
-    subnet = find_or_create_subnet('net1', network=network)
+    router = find_or_create_router(ROUTER_NAME)
+    network = find_or_create_network(NETWORK_NAME)
+    subnet = find_or_create_subnet(SUBNET_NAME, network=network)
     port = find_or_create_port(network, subnet)
     add_interface_to_router(router, subnet, port)
-    instance = find_or_create_server('blog_app_1', network, subnet, port)
+    _, public_ip_address = find_or_create_server('blog_app_1', network, subnet, port)
+    print('server public ip address is %s' % public_ip_address)
 
 
 def find_or_create_router(router_name):
@@ -209,7 +216,7 @@ def find_or_create_server(server_name, network, subnet, port, image_name='Ubuntu
     :param port: The port which the floating IP address will be attached to
     :param image_name: The name of the image to use - defaults to Ubuntu 16.04 LTS
     :param flavor_name: The name of the flavor to use - defaults to m1.small - m1.tiny is not recommended for Ubuntu
-    :return: The server
+    :return: The server, and its public IP address
     """
     existing_server = conn.compute.find_server(server_name)
 
@@ -248,43 +255,7 @@ def find_or_create_server(server_name, network, subnet, port, image_name='Ubuntu
     conn.compute.add_floating_ip_to_server(server, floating_ip.floating_ip_address)
 
     display('server %s created' % server_name, server)
-    return server
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-# def delete_floating_ip(server):
-#     """
-#     Return floating IP addresses to the pool for the given server.
-#     :param server:  The server instance for which floating IP addresses are to be returned.
-#     :return:
-#
-#     Screwed up first time around, and deleted server so will fake for now.
-#     Should have got the floating IP details from the following property of the server.
-#     addresses={
-#     'net1': [
-#     {'OS-EXT-IPS-MAC:mac_addr': '02:4c:fd:fc:4c:ef', 'version': 4,
-#     'addr': '10.0.0.3', 'OS-EXT-IPS:type': 'fixed'},
-#     {'OS-EXT-IPS-MAC:mac_addr': '02:4c:fd:fc:4c:ef', 'version': 4,
-#     'addr': '87.254.4.145', 'OS-EXT-IPS:type': 'floating'}]}
-#     """
-#     faked_floating_address_id = '2ebb8552-954f-4ba1-980f-e1b07b03f1b7'
-#     try:
-#         floating_ip = conn.network.get_ip(faked_floating_address_id)
-#     except exceptions.NotFoundException:
-#         print('could not find floating ip %s' % faked_floating_address_id)
-#         return
-#
-#     display('floating IP address', floating_ip)
-#
-#     print('deleting floating IP address %s' % floating_ip.floating_ip_address)
-#     conn.network.delete_ip(floating_ip)
-
-
+    return server, floating_ip.floating_ip_address
 
 
 if __name__ == '__main__':

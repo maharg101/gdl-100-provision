@@ -11,8 +11,15 @@ Related links:
 
 import os
 import pprint
+import ipaddress
 
 from openstack import connection, exceptions
+
+# starter environment naming
+SERVER_NAME = 'blog_app_1'
+NETWORK_NAME = 'net1'
+SUBNET_NAME = 'net1'
+ROUTER_NAME = 'r1'
 
 conn = connection.Connection(
     region_name=os.environ['OS_REGION_NAME'],
@@ -49,19 +56,17 @@ def main():
     Main function. Call the various delete methods in the correct order.
     :return:
     """
-    delete_server('blog_app_1')
-
-    delete_floating_ip(None)  # TODO - remove this faked call - see method for details...
-
-    delete_subnet('net1', router_name='r1')
-    delete_network('net1')
-    delete_router('r1')
+    delete_server(SERVER_NAME, NETWORK_NAME)
+    delete_subnet(SUBNET_NAME, ROUTER_NAME)
+    delete_network(NETWORK_NAME)
+    delete_router(ROUTER_NAME)
 
 
-def delete_server(server_name):
+def delete_server(server_name, network_name):
     """
     Delete the server with the given name, if present.
     :param server_name: The name of the server to delete.
+    :param network_name: The name of the network to which the server is attached.
     :return:
     """
     try:
@@ -78,38 +83,35 @@ def delete_server(server_name):
         conn.compute.wait_for_server(server, status='SHUTOFF')
         print('server has stopped')
 
-    delete_floating_ip(server)
+    delete_floating_ip(server, network_name)
 
     print('deleting server %s' % server_name)
     conn.compute.delete_server(server)
 
 
-def delete_floating_ip(server):
+def delete_floating_ip(server, network_name):
     """
-    Return floating IP addresses to the pool for the given server.
-    :param server:  The server instance for which floating IP addresses are to be returned.
+    Release floating IP addresses to the pool for the given server.
+    :param server:  The server instance for which floating IP addresses are to be released.
+    :param network_name: The name of the network to which the server is attached.
     :return:
-
-    Screwed up first time around, and deleted server so will fake for now.
-    Should have got the floating IP details from the following property of the server.
-    addresses={
-    'net1': [
-    {'OS-EXT-IPS-MAC:mac_addr': '02:4c:fd:fc:4c:ef', 'version': 4,
-    'addr': '10.0.0.3', 'OS-EXT-IPS:type': 'fixed'},
-    {'OS-EXT-IPS-MAC:mac_addr': '02:4c:fd:fc:4c:ef', 'version': 4,
-    'addr': '87.254.4.145', 'OS-EXT-IPS:type': 'floating'}]}
     """
-    faked_floating_address_id = '2ebb8552-954f-4ba1-980f-e1b07b03f1b7'
     try:
-        floating_ip = conn.network.get_ip(faked_floating_address_id)
-    except exceptions.NotFoundException:
-        print('could not find floating ip %s' % faked_floating_address_id)
+        fixed_address = server.addresses[network_name][0]['addr']
+    except KeyError:
+        print('no floating IP found')
         return
 
-    display('floating IP address', floating_ip)
+    assert ipaddress.IPv4Address(fixed_address).is_private  # TODO - handle this properly
 
-    print('deleting floating IP address %s' % floating_ip.floating_ip_address)
-    conn.network.delete_ip(floating_ip)
+    floating_ips = list(conn.network.ips())  # querying with fixed_ip_address=fixed_address seems to be broken ? .....
+    floating_ips_to_delete = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
+
+    display('floating IP address(es)', floating_ips_to_delete)
+
+    for floating_ip in floating_ips_to_delete:
+        print('deleting floating IP address %s' % floating_ip.floating_ip_address)
+        conn.network.delete_ip(floating_ip)
 
 
 def delete_subnet(subnet_name, router_name):
