@@ -33,9 +33,9 @@ class OpenStackFacade(object):
         else:
             self.conn = conn
         if silent:
-            __class__.display = lambda *args, **kwargs: None
+            self.silent_mode()
 
-    # --------------------- Utility methods ---------------------
+    # --------------------- Connection methods ---------------------
 
     @staticmethod
     def create_connection_from_environ():
@@ -57,6 +57,16 @@ class OpenStackFacade(object):
             identity_interface='internal',
         )
         return conn
+
+    # --------------------- Display methods ---------------------
+
+    @staticmethod
+    def silent_mode(self):
+        """
+        Run in silent mode.
+        :return:
+        """
+        __class__.display = lambda *args, **kwargs: None
 
     @staticmethod
     def display(label, data=None):
@@ -326,27 +336,6 @@ class OpenStackFacade(object):
                 self.display('deleting floating IP address %s' % floating_ip.floating_ip_address)
                 self.conn.network.delete_ip(floating_ip)
 
-    def get_public_addresses(self, server, network_name):
-        """
-        Return a list of public (floating IP) addresses for the given server on the named network.
-        :param server: The server for which to return the addresses.
-        :param network_name: The name of the network which the addresses are associated with.
-        :return: A list of floating IP objects, or None if none are present.
-        """
-        try:
-            fixed_address = server.addresses[network_name][0]['addr']
-        except KeyError:
-            floating_ips_for_this_server = None
-        except TypeError:
-            floating_ips_for_this_server = None
-        else:
-            assert ipaddress.IPv4Address(fixed_address).is_private  # TODO - handle this properly
-            floating_ips = list(
-                self.conn.network.ips()  # querying with fixed_ip_address=fixed_address seems to be broken ? .....
-            )
-            floating_ips_for_this_server = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
-        return floating_ips_for_this_server
-
     def delete_subnet(self, subnet_name, router_name):
         """
         Delete the named subnet.
@@ -437,3 +426,26 @@ class OpenStackFacade(object):
 
         self.display('deleting router %s' % router_name)
         self.conn.network.delete_router(router)
+
+    # --------------------- Utility methods ---------------------
+
+    def get_public_addresses(self, server, network_name):
+        """
+        Return a list of public (floating IP) addresses for the given server on the named network.
+        :param server: The server for which to return the addresses.
+        :param network_name: The name of the network which the addresses are associated with.
+        :return: A list of floating IP objects, or None if none are present.
+        """
+        try:
+            fixed_address = server.addresses[network_name][0]['addr']
+        except KeyError:
+            floating_ips_for_this_server = None
+        except TypeError:
+            floating_ips_for_this_server = None
+        else:
+            assert ipaddress.IPv4Address(fixed_address).is_private  # TODO - handle this properly
+            floating_ips = list(
+                self.conn.network.ips()  # querying with fixed_ip_address=fixed_address seems to be broken ? .....
+            )
+            floating_ips_for_this_server = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
+        return floating_ips_for_this_server
