@@ -61,7 +61,7 @@ class OpenStackFacade(object):
     # --------------------- Display methods ---------------------
 
     @staticmethod
-    def silent_mode(self):
+    def silent_mode():
         """
         Run in silent mode.
         :return:
@@ -191,7 +191,7 @@ class OpenStackFacade(object):
     
         if ports_on_network_and_subnet:
             existing_port = ports_on_network_and_subnet[0]  # TODO - can there be more than one ?
-            self.display('port %s found', existing_port)
+            self.display('port found', existing_port)
             return existing_port
     
         default_security_group = self.conn.network.find_security_group('default')
@@ -240,9 +240,9 @@ class OpenStackFacade(object):
             server = self.conn.compute.get_server(pre_existing_server.id)
             self.display('server %s found' % server_name, server)
             return server
-    
-        image = self.conn.compute.find_image(image_name)
-        flavor = self.conn.compute.find_flavor(flavor_name)
+
+        image = self.get_image(image_name)
+        flavor = self.get_flavor(flavor_name)
     
         params = dict(
             name=server_name,
@@ -250,9 +250,7 @@ class OpenStackFacade(object):
             flavor_id=flavor.id,
             networks=[{"uuid": network.id}],
         )
-
         self.set_key_pair(params)
-    
         server = self.conn.compute.create_server(**params)
         self.conn.compute.wait_for_server(server, status='ACTIVE')
         self.assign_floating_ip(network, port, server, subnet)
@@ -449,3 +447,46 @@ class OpenStackFacade(object):
             )
             floating_ips_for_this_server = [x for x in floating_ips if x.fixed_ip_address == fixed_address]
         return floating_ips_for_this_server
+
+    def get_flavor(self, flavor_name):
+        """
+        Get a flavor object by name.
+        :param flavor_name: The name of the flavor to get.
+        :return: The Flavor object.
+        """
+        flavor_stub = self.conn.compute.find_flavor(flavor_name)
+        if flavor_stub:
+            return self.conn.compute.get_flavor(flavor_stub.id)
+
+    def get_image(self, image_name):
+        """
+        Get an image object by name.
+        :param image_name: The name of the image to get.
+        :return: The Image object.
+        """
+        image_stub = self.conn.compute.find_image(image_name)
+        if image_stub:
+            return self.conn.compute.get_image(image_stub.id)
+
+    @staticmethod
+    def validate_image_flavor_combination(image, flavor):
+        """
+        Validate a combination of image and flavor.
+        :param image_name: The image.
+        :param flavor_name: The flavor.
+        :return: None if the combination is valid, or a string containing an explanatory message if invalid.
+        """
+        ram_woe = flavor.ram < image.min_ram
+        disk_woe = flavor.disk < image.min_disk
+
+        if ram_woe and disk_woe:
+            message = '%s does not have the minimum recommended RAM or disk for %s' % (flavor.name, image.name)
+        elif ram_woe:
+            message = '%s does not have the minimum recommended RAM for %s' % (flavor.name, image.name)
+        elif disk_woe:
+            message = '%s does not have the minimum recommended disk for %s' % (flavor.name, image.name)
+        else:
+            message = None
+
+        return message
+
