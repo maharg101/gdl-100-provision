@@ -13,7 +13,11 @@ the OpenStack Quick Start documentation.*
  
  - `start_blog_app_1.py` - uses the OpenStack SDK to start the blog_app_1 instance in the 'starter' environment
 
- - `stop_blog_app_1.py` - uses the OpenStack SDK shut down the blog_app_1 instance in the 'starter' environment
+ - `stop_blog_app_1.py` - uses the OpenStack SDK to shut down the blog_app_1 instance in the 'starter' environment
+ 
+ - `clear_environment.py` - uses the OpenStack SDK to clear down the 'starter' environment
+ 
+ - `build_environment.py` - uses the OpenStack SDK to build the 'starter' environment
 
 ## Deployment
 
