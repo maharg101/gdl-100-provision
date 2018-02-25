@@ -12,7 +12,7 @@ Related links:
 import sys
 sys.path.insert(1, '..')  # adjust path to enable 'learning' utilities to remain isolated from core deliverables.
 
-from openstack_infrastructure import facade as osf
+from openstack_infrastructure import facade as osf  # noqa: E402
 
 # starter environment naming
 SERVER_NAME = 'blog_app_1'
