@@ -57,21 +57,33 @@ class InfrastructureManager(object):
         port = self.os_facade.find_or_create_port(network, subnet)
         self.os_facade.add_interface_to_router(router, subnet, port)
         servers = OrderedDict()
-        self.create_salt_server(network, port, subnet, servers)
-        self.create_app_servers(network, port, subnet, servers)
+        salt_master_address = self.create_salt_server(network, port, subnet, servers)
+        app_server_names = self.create_app_servers(network, port, subnet, servers, salt_master_address)
+        fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
+        fab_utils.apply_state(salt_master_address)
         return servers
 
-    def create_app_servers(self, network, port, subnet, servers):
+    def create_app_servers(self, network, port, subnet, servers, salt_master_address):
         """
         Create the app servers
         :param network: The network to create the server on
         :param port: The port which the floating IP address will be attached to
         :param subnet: The subnet on which to create the floating IP address
         :param servers: A dict to add the server name and IP address(es) to
-        :return: None
+        :param salt_master_address: The address of the salt master
+        :return: A list of the server names
         """
+        server_names = []
         for server_number in range(self.params['num_servers']):
-            self.create_server(network, port, subnet, servers, server_number)
+            server_name_postfix = server_number
+            public_ip_addresses = self.create_server(network, port, subnet, servers, server_name_postfix)
+            if public_ip_addresses:
+                fab_utils.bootstrap_salt_minion(public_ip_addresses[0].floating_ip_address, salt_master_address)
+            else:
+                logger.fatal('No public address found for salt minion for app server #%s' % server_number)
+                sys.exit(1)
+            server_names.append(utils.construct_server_name(self.params, server_name_postfix))
+        return server_names
 
     def create_salt_server(self, network, port, subnet, servers):
         """
@@ -80,26 +92,28 @@ class InfrastructureManager(object):
         :param port: The port which the floating IP address will be attached to
         :param subnet: The subnet on which to create the floating IP address
         :param servers: A dict to add the server name and IP address(es) to
-        :return: None
+        :return: The public IP address of the salt server
         """
         public_ip_addresses = self.create_server(network, port, subnet, servers, SALT_SERVER_POSTFIX)
         if public_ip_addresses:
-            fab_utils.bootstrap_salt_master(public_ip_addresses[0].floating_ip_address)
+            salt_master_address = public_ip_addresses[0].floating_ip_address
+            fab_utils.bootstrap_salt_master(salt_master_address)
+            return salt_master_address
         else:
-            logger.fatal('No public address found for salt master')
+            logger.fatal('No public address found for salt server')
             sys.exit(1)
 
-    def create_server(self, network, port, subnet, servers, server_name):
+    def create_server(self, network, port, subnet, servers, server_name_postfix):
         """
         Create a server
         :param network: The network to create the server on
         :param port: The port which the floating IP address will be attached to
         :param subnet: The subnet on which to create the floating IP address
         :param servers: A dict to add the server name and IP address(es) to
-        :param server_name: The name of the server
+        :param server_name_postfix: The postfix to be used in naming of the server
         :return: List of public IP addresses for the server
         """
-        server_name = utils.construct_server_name(self.params, server_name)
+        server_name = utils.construct_server_name(self.params, server_name_postfix)
         server = self.os_facade.find_or_create_server(server_name, network, subnet, port)
         public_ip_addresses = self.os_facade.get_public_addresses(server, self.params['network_name'])
         servers[server_name] = [x.floating_ip_address for x in public_ip_addresses]

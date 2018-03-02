@@ -13,9 +13,9 @@ from build_utils import utils
 
 class TestPopulateParams(unittest.TestCase):
 
-    def test_populate_params_optimal(self):
+    def test_populate_params_optimal_underscore(self):
         """
-        Test that populate_params works as expected with optimal inputs.
+        Test that populate_params works as expected with optimal inputs including underscores.
         """
         params = dict(
             app='hello_world',
@@ -24,14 +24,14 @@ class TestPopulateParams(unittest.TestCase):
             server_size='t1.micro',
         )
         expected_params = dict(
-            app='hello_world',
+            app='hello-world',
             environment='dev',
             num_servers=1,
             server_size='t1.micro',
-            router_name='router_hello_world_dev',
-            network_name='network_hello_world_dev',
-            subnet_name='subnet_hello_world_dev',
-            server_base_name='server_hello_world_dev',
+            router_name='router-hello-world-dev',
+            network_name='network-hello-world-dev',
+            subnet_name='subnet-hello-world-dev',
+            server_base_name='hello-world-dev',
         )
         utils.populate_params(params)  # updates in place
         self.assertEqual(params, expected_params)
@@ -48,13 +48,13 @@ class TestPopulateParams(unittest.TestCase):
         )
         expected_params = dict(
             app='helloworld-2',
-            environment='dev 2',
+            environment='dev-2',
             num_servers=1,
             server_size='t1.micro',
-            router_name='router_helloworld-2_dev 2',
-            network_name='network_helloworld-2_dev 2',
-            subnet_name='subnet_helloworld-2_dev 2',
-            server_base_name='server_helloworld-2_dev 2',
+            router_name='router-helloworld-2-dev-2',
+            network_name='network-helloworld-2-dev-2',
+            subnet_name='subnet-helloworld-2-dev-2',
+            server_base_name='helloworld-2-dev-2',
         )
         utils.populate_params(params)  # updates in place
         self.assertEqual(params, expected_params)
@@ -67,18 +67,18 @@ class TestConstructServerName(unittest.TestCase):
         Test that construct_server_name works as expected with an integer postfix.
         """
         params = dict(
-            app='hello_world',
+            app='hello-world',
             environment='dev',
             num_servers=1,
             server_size='t1.micro',
-            router_name='router_hello_world_dev',
-            network_name='network_hello_world_dev',
-            subnet_name='subnet_hello_world_dev',
-            server_base_name='server_hello_world_dev',
+            router_name='router-hello-world_dev',
+            network_name='network-hello-world-dev',
+            subnet_name='subnet-hello-world-dev',
+            server_base_name='hello-world-dev',
         )
         self.assertEqual(
             utils.construct_server_name(params, 0),
-            'server_hello_world_dev_0'
+            'hello-world-dev-0'
         )
 
     def test_construct_server_name_string_postfix(self):
@@ -86,16 +86,16 @@ class TestConstructServerName(unittest.TestCase):
         Test that construct_server_name works as expected with a string postfix.
         """
         params = dict(
-            app='hello_world',
+            app='hello-world',
             environment='dev',
             num_servers=1,
             server_size='t1.micro',
-            router_name='router_hello_world_dev',
-            network_name='network_hello_world_dev',
-            subnet_name='subnet_hello_world_dev',
-            server_base_name='server_hello_world_dev',
+            router_name='router-hello-world-dev',
+            network_name='network-hello-world-dev',
+            subnet_name='subnet-hello-world-dev',
+            server_base_name='hello-world-dev',
         )
         self.assertEqual(
             utils.construct_server_name(params, 'foo'),
-            'server_hello_world_dev_foo'
+            'hello-world-dev-foo'
         )
