@@ -35,11 +35,11 @@ def populate_params(params):
     )
 
 
-def construct_server_name(params, server_name_postfix):
+def construct_server_name(params, server_name_prefix):
     """
-    Construct and return a server name for the given postfix
+    Construct and return a server name for the given prefix
     :param params: The params dict containing the server base name
-    :param server_name_postfix: An integer or string postfix to apply to the server base name
+    :param server_name_prefix: A string prefix to apply to the server base name
     :return: Server name string
     """
-    return '%s-%s' % (params['server_base_name'], str(server_name_postfix))
+    return '%s-%s' % (str(server_name_prefix), params['server_base_name'])

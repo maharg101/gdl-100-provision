@@ -78,7 +78,7 @@ class TestConstructServerName(unittest.TestCase):
         )
         self.assertEqual(
             utils.construct_server_name(params, 0),
-            'hello-world-dev-0'
+            '0-hello-world-dev'
         )
 
     def test_construct_server_name_string_postfix(self):
@@ -97,5 +97,5 @@ class TestConstructServerName(unittest.TestCase):
         )
         self.assertEqual(
             utils.construct_server_name(params, 'foo'),
-            'hello-world-dev-foo'
+            'foo-hello-world-dev'
         )

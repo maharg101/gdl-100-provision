@@ -21,7 +21,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 IMAGE_NAME = 'Ubuntu 16.04 LTS'
-SALT_SERVER_POSTFIX = 'salt'
+SALT_SERVER_PREFIX = 'salt'
+APP_SERVER_PREFIX = 'app'
 
 
 class InfrastructureManager(object):
@@ -75,14 +76,14 @@ class InfrastructureManager(object):
         """
         server_names = []
         for server_number in range(self.params['num_servers']):
-            server_name_postfix = server_number
-            public_ip_addresses = self.create_server(network, port, subnet, servers, server_name_postfix)
+            server_name_prefix = '%s-%s' % (APP_SERVER_PREFIX, server_number)
+            public_ip_addresses = self.create_server(network, port, subnet, servers, server_name_prefix)
             if public_ip_addresses:
                 fab_utils.bootstrap_salt_minion(public_ip_addresses[0].floating_ip_address, salt_master_address)
             else:
                 logger.fatal('No public address found for salt minion for app server #%s' % server_number)
                 sys.exit(1)
-            server_names.append(utils.construct_server_name(self.params, server_name_postfix))
+            server_names.append(utils.construct_server_name(self.params, server_name_prefix))
         return server_names
 
     def create_salt_server(self, network, port, subnet, servers):
@@ -94,7 +95,7 @@ class InfrastructureManager(object):
         :param servers: A dict to add the server name and IP address(es) to
         :return: The public IP address of the salt server
         """
-        public_ip_addresses = self.create_server(network, port, subnet, servers, SALT_SERVER_POSTFIX)
+        public_ip_addresses = self.create_server(network, port, subnet, servers, SALT_SERVER_PREFIX)
         if public_ip_addresses:
             salt_master_address = public_ip_addresses[0].floating_ip_address
             fab_utils.bootstrap_salt_master(salt_master_address)
@@ -103,17 +104,17 @@ class InfrastructureManager(object):
             logger.fatal('No public address found for salt server')
             sys.exit(1)
 
-    def create_server(self, network, port, subnet, servers, server_name_postfix):
+    def create_server(self, network, port, subnet, servers, server_name_prefix):
         """
         Create a server
         :param network: The network to create the server on
         :param port: The port which the floating IP address will be attached to
         :param subnet: The subnet on which to create the floating IP address
         :param servers: A dict to add the server name and IP address(es) to
-        :param server_name_postfix: The postfix to be used in naming of the server
+        :param server_name_prefix: The prefix to be used in naming of the server
         :return: List of public IP addresses for the server
         """
-        server_name = utils.construct_server_name(self.params, server_name_postfix)
+        server_name = utils.construct_server_name(self.params, server_name_prefix)
         server = self.os_facade.find_or_create_server(server_name, network, subnet, port)
         public_ip_addresses = self.os_facade.get_public_addresses(server, self.params['network_name'])
         servers[server_name] = [x.floating_ip_address for x in public_ip_addresses]
@@ -138,7 +139,7 @@ class InfrastructureManager(object):
         :return: None
         """
         for server_number in range(self.params['num_servers']):
-            server_name = utils.construct_server_name(self.params, server_number)
+            server_name = utils.construct_server_name(self.params, '%s-%s' % (APP_SERVER_PREFIX, server_number))
             self.os_facade.delete_server(server_name, self.params['network_name'])
 
     def delete_salt_server(self):
@@ -146,7 +147,7 @@ class InfrastructureManager(object):
         Delete the salt master server
         :return: None
         """
-        server_name = utils.construct_server_name(self.params, SALT_SERVER_POSTFIX)
+        server_name = utils.construct_server_name(self.params, SALT_SERVER_PREFIX)
         self.os_facade.delete_server(server_name, self.params['network_name'])
 
     def validate_image_and_flavor(self):

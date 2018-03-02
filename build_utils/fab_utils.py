@@ -21,10 +21,11 @@ def _bootstrap_salt_master():
     Bootstrap the salt master
     :return: None
     """
-    salt_dir = '/srv/salt'
+    salt_dir = '/srv'
     with settings(warn_only=True):
-        if sudo('test -d %s' % salt_dir).failed:
-            sudo('git clone https://github.com/maharg101/gdl-100-salt %s' % salt_dir)
+        with cd(salt_dir):
+            if run('git rev-parse --git-dir > /dev/null 2>&1').failed:
+                sudo('git clone https://github.com/maharg101/gdl-100-salt %s' % salt_dir)
     with settings(warn_only=False):
         with cd(salt_dir):
             sudo('git pull')
@@ -96,7 +97,7 @@ def _apply_state():
     :return: None
     """
     with settings(warn_only=False):
-        sudo('sh /srv/salt/apply_state.sh')
+        sudo('sh /srv/apply_state.sh')
 
 
 def apply_state(salt_master_address):
