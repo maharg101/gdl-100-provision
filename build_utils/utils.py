@@ -29,3 +29,12 @@ def populate_params(params):
             server_base_name='server_%s_%s' % (app_id, env_id),
         )
     )
+
+
+def construct_server_name(params, server_name_postfix):
+    """
+    Construct and return a server name for the given postfix
+    :param server_name_postfix: An integer or string postfix to apply to the server base name
+    :return: Server name string
+    """
+    return '%s_%s' % (params['server_base_name'], str(server_name_postfix))

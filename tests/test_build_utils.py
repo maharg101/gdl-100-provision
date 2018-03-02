@@ -11,7 +11,7 @@ import unittest
 from build_utils import utils
 
 
-class TestBuildUtils(unittest.TestCase):
+class TestPopulateParams(unittest.TestCase):
 
     def test_populate_params_optimal(self):
         """
@@ -58,3 +58,44 @@ class TestBuildUtils(unittest.TestCase):
         )
         utils.populate_params(params)  # updates in place
         self.assertEqual(params, expected_params)
+
+
+class TestConstructServerName(unittest.TestCase):
+
+    def test_construct_server_name_integer_postfix(self):
+        """
+        Test that construct_server_name works as expected with an integer postfix.
+        """
+        params = dict(
+            app='hello_world',
+            environment='dev',
+            num_servers=1,
+            server_size='t1.micro',
+            router_name='router_hello_world_dev',
+            network_name='network_hello_world_dev',
+            subnet_name='subnet_hello_world_dev',
+            server_base_name='server_hello_world_dev',
+        )
+        self.assertEqual(
+            utils.construct_server_name(params, 0),
+            'server_hello_world_dev_0'
+        )
+
+    def test_construct_server_name_string_postfix(self):
+        """
+        Test that construct_server_name works as expected with a string postfix.
+        """
+        params = dict(
+            app='hello_world',
+            environment='dev',
+            num_servers=1,
+            server_size='t1.micro',
+            router_name='router_hello_world_dev',
+            network_name='network_hello_world_dev',
+            subnet_name='subnet_hello_world_dev',
+            server_base_name='server_hello_world_dev',
+        )
+        self.assertEqual(
+            utils.construct_server_name(params, 'foo'),
+            'server_hello_world_dev_foo'
+        )
