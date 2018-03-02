@@ -13,7 +13,7 @@ import argparse
 import logging
 import sys
 
-from build_utils import utils
+from build_utils import fab_utils, utils
 from collections import OrderedDict
 from openstack_infrastructure import facade as osf
 
@@ -82,7 +82,12 @@ class InfrastructureManager(object):
         :param servers: A dict to add the server name and IP address(es) to
         :return: None
         """
-        self.create_server(network, port, subnet, servers, SALT_SERVER_POSTFIX)
+        public_ip_addresses = self.create_server(network, port, subnet, servers, SALT_SERVER_POSTFIX)
+        if public_ip_addresses:
+            fab_utils.bootstrap_salt_master(public_ip_addresses[0].floating_ip_address)
+        else:
+            logger.fatal('No public address found for salt master')
+            sys.exit(1)
 
     def create_server(self, network, port, subnet, servers, server_name):
         """
@@ -92,12 +97,13 @@ class InfrastructureManager(object):
         :param subnet: The subnet on which to create the floating IP address
         :param servers: A dict to add the server name and IP address(es) to
         :param server_name: The name of the server
-        :return: None
+        :return: List of public IP addresses for the server
         """
         server_name = utils.construct_server_name(self.params, server_name)
         server = self.os_facade.find_or_create_server(server_name, network, subnet, port)
         public_ip_addresses = self.os_facade.get_public_addresses(server, self.params['network_name'])
         servers[server_name] = [x.floating_ip_address for x in public_ip_addresses]
+        return public_ip_addresses
 
     def destroy(self):
         """
@@ -158,13 +164,13 @@ def main():
     parser.add_argument("server_size", help="the server size e.g. t1.micro")
     parser.add_argument("-d", "--destroy", help="destroy the environment, don't create it", action="store_true")
     args = parser.parse_args()
-    builder = InfrastructureManager(vars(args), osf.OpenStackFacade(silent=False))
+    manager = InfrastructureManager(vars(args), osf.OpenStackFacade(silent=False))
     if args.destroy:
         print('destroying...')
-        builder.destroy()
+        manager.destroy()
     else:
         print('building...')
-        servers = builder.build()
+        servers = manager.build()
         for server_name, public_ip_addresses in servers.items():
             print('server %s public IP address : %s' % (server_name, ','.join(public_ip_addresses)))
 
