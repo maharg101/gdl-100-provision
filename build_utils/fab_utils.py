@@ -31,7 +31,7 @@ def _bootstrap_salt_master():
             sudo('git pull')
         with cd('/tmp'):
             run('curl -L https://bootstrap.saltstack.com -o install_salt.sh')
-            sudo('sh install_salt.sh -M')
+            sudo('sh install_salt.sh -M -L')
 
 
 def bootstrap_salt_master(salt_master_address):
