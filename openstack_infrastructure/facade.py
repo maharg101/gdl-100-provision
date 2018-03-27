@@ -244,14 +244,14 @@ class OpenStackFacade(object):
         image = self.get_image(image_name)
         flavor = self.get_flavor(flavor_name)
     
-        params = dict(
+        server_params = dict(
             name=server_name,
             image_id=image.id,
             flavor_id=flavor.id,
             networks=[{"uuid": network.id}],
         )
-        self.set_key_pair(params)
-        server = self.conn.compute.create_server(**params)
+        self.set_key_pair_name(server_params)
+        server = self.conn.compute.create_server(**server_params)
         self.conn.compute.wait_for_server(server, status='ACTIVE')
         self.assign_floating_ip(network, port, server, subnet)
         created_server = self.conn.compute.get_server(server.id)
@@ -279,15 +279,24 @@ class OpenStackFacade(object):
         self.conn.compute.add_floating_ip_to_server(server, floating_ip.floating_ip_address)
         return floating_ip
 
-    def set_key_pair(self, params):
+    def get_name_of_first_key_pair(self):
         """
-        Add the first key pair found (if any) to the params for the server.
-        :param params: The params dict to add the key pair to.
-        :return:
+        Return the name of the first key pair found, or None.
+        :return: The name of the first key pair found, or None.
         """
         key_pairs = list(self.conn.compute.keypairs())
         if key_pairs:
-            params['key_name'] = key_pairs[0].name
+            return key_pairs[0].name
+
+    def set_key_pair_name(self, server_params):
+        """
+        Add the name of the first key pair found (if any) to the params for the server.
+        :param server_params: The server params dict to add the key pair to.
+        :return:
+        """
+        key_name = self.get_name_of_first_key_pair()
+        if key_name:
+            server_params['key_name'] = key_name
 
     # --------------------- Destroy methods ---------------------
 
