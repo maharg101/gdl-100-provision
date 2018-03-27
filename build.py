@@ -11,9 +11,10 @@ Written by:  maharg101 on 25th February 2018
 
 import argparse
 import logging
+import os
 import sys
 
-from build_utils import fab_utils, utils
+from build_utils import fab_utils, salt_utils, utils
 from collections import OrderedDict
 from openstack_infrastructure import facade as osf
 
@@ -41,9 +42,11 @@ class InfrastructureManager(object):
         Prepare for the build / destroy steps.
         :return:
         """
-        utils.populate_params(self.params)
+        utils.populate_params_from_constructor_args(self.params)
+        utils.populate_openstack_params_from_environ(self.params, os.environ)
         self.params['image_name'] = IMAGE_NAME
         self.validate_image_and_flavor()
+        self.params['key_name'] = self.os_facade.get_name_of_first_key_pair()
 
     def build(self):
         """
@@ -54,6 +57,7 @@ class InfrastructureManager(object):
         self.prepare()
         router = self.os_facade.find_or_create_router(self.params['router_name'])
         network = self.os_facade.find_or_create_network(self.params['network_name'])
+        self.params['fixed_network_id'] = network.id
         subnet = self.os_facade.find_or_create_subnet(self.params['subnet_name'], network=network)
         port = self.os_facade.find_or_create_port(network, subnet)
         self.os_facade.add_interface_to_router(router, subnet, port)
@@ -99,6 +103,7 @@ class InfrastructureManager(object):
         if public_ip_addresses:
             salt_master_address = public_ip_addresses[0].floating_ip_address
             fab_utils.bootstrap_salt_master(salt_master_address)
+            fab_utils.configure_salt_cloud(salt_master_address, salt_utils.generate_openstack_conf(self.params))
             return salt_master_address
         else:
             logger.fatal('No public address found for salt server')

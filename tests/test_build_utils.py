@@ -2,7 +2,7 @@
 """
 test_build_utils.py
 
-Description: Tests for build_utils package.
+Description: Tests for build_utils.utils module.
 Written by:  maharg101 on 25th February 2018
 """
 
@@ -11,11 +11,11 @@ import unittest
 from build_utils import utils
 
 
-class TestPopulateParams(unittest.TestCase):
+class TestPopulateParamsFromConstructorArgs(unittest.TestCase):
 
-    def test_populate_params_optimal_underscore(self):
+    def test_populate_params_from_constructor_args_optimal_underscore(self):
         """
-        Test that populate_params works as expected with optimal inputs including underscores.
+        Test that populate_params_from_constructor_args works as expected with optimal inputs including underscores.
         """
         params = dict(
             app='hello_world',
@@ -33,12 +33,12 @@ class TestPopulateParams(unittest.TestCase):
             subnet_name='subnet-hello-world-dev',
             server_base_name='hello-world-dev',
         )
-        utils.populate_params(params)  # updates in place
+        utils.populate_params_from_constructor_args(params)  # updates in place
         self.assertEqual(params, expected_params)
 
-    def test_populate_params_unusual_input(self):
+    def test_populate_params_from_constructor_args_unusual_input(self):
         """
-        Test that populate_params works as expected with not-so-optimal inputs.
+        Test that populate_params_from_constructor_args works as expected with not-so-optimal inputs.
         """
         params = dict(
             app='%%hello\tworld££~-2',
@@ -56,7 +56,7 @@ class TestPopulateParams(unittest.TestCase):
             subnet_name='subnet-helloworld-2-dev-2',
             server_base_name='helloworld-2-dev-2',
         )
-        utils.populate_params(params)  # updates in place
+        utils.populate_params_from_constructor_args(params)  # updates in place
         self.assertEqual(params, expected_params)
 
 
@@ -99,3 +99,35 @@ class TestConstructServerName(unittest.TestCase):
             utils.construct_server_name(params, 'foo'),
             'foo-hello-world-dev'
         )
+
+
+class TestPopulateOpenStackParamsFromEnviron(unittest.TestCase):
+
+    def test_populate_openstack_params_from_environ(self):
+        """
+        Test that populate_openstack_params_from_environ works as expected.
+        :return:
+        """
+        params = dict(
+            foo='bar',
+        )
+        env_dict = dict(
+            OS_AUTH_URL='https://some.cloud/foo/auth',
+            OS_IDENTITY_API_VERSION=3,
+            OS_REGION_NAME='RegionX',
+            OS_USERNAME='flateric',
+            OS_USER_DOMAIN_NAME='badger',
+            OS_PASSWORD='hackme',
+            IRRELEVANT='blah',
+        )
+        expected_params = dict(
+            foo='bar',
+            OS_AUTH_URL='https://some.cloud/foo/auth',
+            OS_IDENTITY_API_VERSION=3,
+            OS_REGION_NAME='RegionX',
+            OS_USERNAME='flateric',
+            OS_USER_DOMAIN_NAME='badger',
+            OS_PASSWORD='hackme',
+        )
+        utils.populate_openstack_params_from_environ(params, env_dict)  # updates in place
+        self.assertEqual(params, expected_params)

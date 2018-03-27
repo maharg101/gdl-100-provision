@@ -9,6 +9,7 @@ Written by:  maharg101 on 25th February 2018
 import functools
 
 from fabric.api import *
+from fabric.operations import put
 
 env.connection_attempts = 5
 env.disable_known_hosts = True  # http://docs.fabfile.org/en/1.14/usage/ssh.html
@@ -42,6 +43,28 @@ def bootstrap_salt_master(salt_master_address):
     """
     env.host_string = salt_master_address
     execute(_bootstrap_salt_master)
+
+
+def _configure_salt_cloud(openstack_cloud_config):
+    """
+    Configure Salt Cloud on the salt master.
+    :param openstack_cloud_config: The openstack cloud configuration (StringIO).
+    :return: None
+    """
+    with cd('/etc/salt/cloud.providers.d/'):
+        put(openstack_cloud_config, 'openstack.conf', use_sudo=True)
+
+
+def configure_salt_cloud(salt_master_address, openstack_cloud_config):
+    """
+    Configure Salt Cloud on the salt master.
+    :param salt_master_address: The public address of the salt master
+    :param openstack_cloud_config: The openstack cloud configuration (StringIO).
+    :return:
+    """
+    env.host_string = salt_master_address
+    func = functools.partial(_configure_salt_cloud, openstack_cloud_config=openstack_cloud_config)
+    execute(func)
 
 
 def _bootstrap_salt_minion(salt_master_address):
