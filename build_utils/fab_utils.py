@@ -33,6 +33,8 @@ def _bootstrap_salt_master():
         with cd('/tmp'):
             run('curl -L https://bootstrap.saltstack.com -o install_salt.sh')
             sudo('sh install_salt.sh -M -L')
+            sudo('apt-get  --yes --force-yes install python-pip')
+            sudo('pip install shade')  # Salt Cloud 2018.3.0 requires shade but does not install it
 
 
 def bootstrap_salt_master(salt_master_address):
