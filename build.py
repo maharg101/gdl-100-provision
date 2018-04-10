@@ -57,7 +57,6 @@ class InfrastructureManager(object):
         self.prepare()
         router = self.os_facade.find_or_create_router(self.params['router_name'])
         network = self.os_facade.find_or_create_network(self.params['network_name'])
-        self.params['fixed_network_id'] = network.id
         subnet = self.os_facade.find_or_create_subnet(self.params['subnet_name'], network=network)
         port = self.os_facade.find_or_create_port(network, subnet)
         self.os_facade.add_interface_to_router(router, subnet, port)

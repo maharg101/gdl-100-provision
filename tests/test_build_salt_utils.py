@@ -25,32 +25,30 @@ class TestGenerateOpenStackConf(unittest.TestCase):
                 OS_REGION_NAME='RegionX',
                 OS_USERNAME='flateric',
                 OS_USER_DOMAIN_NAME='badger',
+                OS_PROJECT_DOMAIN_NAME='fox',
                 OS_PASSWORD='hackme',
+                OS_PROJECT_ID='183f44dd82457385d4d4d8e702c45661',
                 key_name='badman 1337',
-                fixed_network_id='d34db33f-80zx-789c-a1a2-1d12345a123d',
+                network_name='network-blog-dev',
         )
 
         expected = yaml.load(
             """\
-openstack_config:
-  auth_version: %(OS_IDENTITY_API_VERSION)d
-  compute_name: nova
-  compute_region: %(OS_REGION_NAME)s
-  domain: %(OS_USER_DOMAIN_NAME)s
+openstack:
   driver: openstack
-  identity_url: %(OS_AUTH_URL)s/auth/tokens
-  insecure: false
+  region_name: %(OS_REGION_NAME)s
+  auth:
+    username: %(OS_USERNAME)s
+    password: %(OS_PASSWORD)s
+    project_id: %(OS_PROJECT_ID)s
+    auth_url: %(OS_AUTH_URL)s
+    user_domain_name: %(OS_USER_DOMAIN_NAME)s
+    project_domain_name: %(OS_PROJECT_DOMAIN_NAME)s
   networks:
-  - fixed:
-    - %(fixed_network_id)s
-  - floating:
-    - public
-  password: %(OS_PASSWORD)s
-  service_type: compute
-  ssh_key_file: /etc/salt/pki/master/master.pem
-  ssh_key_name: %(key_name)s
-  tenant: %(OS_USERNAME)s
-  user: %(OS_USERNAME)s
+  - name: public
+    nat_source: true
+  - name: %(network_name)s
+    nat_destination: true
 """ % params
         )
 

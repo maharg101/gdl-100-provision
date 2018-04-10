@@ -17,23 +17,20 @@ def generate_openstack_conf(params):
     :return: StringIO populated with the generated openstack configuration.
     """
     openstack_conf_data = dict(
-        openstack_config=dict(
-            identity_url='%s/auth/tokens' % params['OS_AUTH_URL'],
-            auth_version=int(params['OS_IDENTITY_API_VERSION']),
-            compute_name='nova',  # TODO - can this be different ?
-            compute_region=params['OS_REGION_NAME'],
-            service_type='compute',
-            tenant=params['OS_USERNAME'],  # TODO - can the tenant be different from the username ?
-            domain=params['OS_USER_DOMAIN_NAME'],  # TODO - should this be the user or project domain name ?
-            user=params['OS_USERNAME'],
-            password=params['OS_PASSWORD'],
+        openstack=dict(
             driver='openstack',
-            ssh_key_name=params['key_name'],  # TODO - populate this earlier - currently done in facade.set_key_pair
-            insecure=False,
-            ssh_key_file='/etc/salt/pki/master/master.pem',
+            region_name=params['OS_REGION_NAME'],
+            auth=dict(
+                username=params['OS_USERNAME'],
+                password=params['OS_PASSWORD'],
+                project_id=params['OS_PROJECT_ID'],
+                auth_url=params['OS_AUTH_URL'],
+                user_domain_name=params['OS_USER_DOMAIN_NAME'],
+                project_domain_name=params['OS_PROJECT_DOMAIN_NAME'],
+            ),
             networks=[
-                dict(fixed=[params['fixed_network_id']]),  # TODO - populate this when known
-                dict(floating=['public']),
+                dict(name='public', nat_source=True),
+                dict(name=params['network_name'], nat_destination=True),
             ]
         )
     )
