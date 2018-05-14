@@ -47,8 +47,11 @@ openstack:
   networks:
   - name: public
     nat_source: true
+    routes_externally: true
+    routes_ipv4_externally: true
   - name: %(network_name)s
     nat_destination: true
+    default_interface: true
 """ % params
         )
 

@@ -29,8 +29,8 @@ def generate_openstack_conf(params):
                 project_domain_name=params['OS_PROJECT_DOMAIN_NAME'],
             ),
             networks=[
-                dict(name='public', nat_source=True),
-                dict(name=params['network_name'], nat_destination=True),
+                dict(name='public', nat_source=True, routes_externally=True, routes_ipv4_externally=True),
+                dict(name=params['network_name'], nat_destination=True, default_interface=True),
             ]
         )
     )
