@@ -103,10 +103,29 @@ class InfrastructureManager(object):
             salt_master_address = public_ip_addresses[0].floating_ip_address
             fab_utils.bootstrap_salt_master(salt_master_address)
             fab_utils.configure_salt_cloud(salt_master_address, salt_utils.generate_openstack_conf(self.params))
+            self.configure_salt_cloud_key_pair(salt_master_address)
             return salt_master_address
         else:
             logger.fatal('No public address found for salt server')
             sys.exit(1)
+
+    def configure_salt_cloud_key_pair(self, salt_master_address):
+        """
+        Configure the salt cloud key pair.
+        The logic here is that the key is generated on first run, at which time openstack returns a key pair with
+        a 'private_key' entry. This private key is then written as the root user private key on the salt master.
+        On subsequent runs, the key is already in place. This works because openstack only returns the private key
+        when the key pair is generated.
+        :param salt_master_address:
+        :return: None
+        """
+        key_pair = self.os_facade.get_or_create_key_pair('salt-cloud')
+        private_key = getattr(key_pair, 'private_key', None)
+        if private_key:
+            logger.info('Writing private key for salt-cloud')
+            fab_utils.write_salt_master_private_key(salt_master_address, private_key)
+        else:
+            logger.info('Private key for salt-cloud is already configured')
 
     def create_server(self, network, port, subnet, servers, server_name_prefix):
         """
