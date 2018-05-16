@@ -7,6 +7,8 @@ Written by:  maharg101 on 25th February 2018
 """
 
 import functools
+import io
+import yaml
 
 from fabric.api import *
 from fabric.operations import put
@@ -55,6 +57,26 @@ def _configure_salt_cloud(openstack_cloud_config):
     """
     with cd('/etc/salt/cloud.providers.d/'):
         put(openstack_cloud_config, 'openstack.conf', use_sudo=True)
+    with cd('/etc/salt/cloud.profiles.d/'):
+        put(
+            io.StringIO(
+                yaml.dump(
+                    dict(
+                        m1_small_ubuntu=dict(
+                            provider='openstack',
+                            image='Ubuntu 16.04 LTS',
+                            size='m1.small',
+                            ssh_key_name='salt-cloud',
+                            ssh_key_file='/root/.ssh/id_rsa',
+                            ssh_username=env.user
+                        )
+                    ),
+                    default_flow_style=False
+                )
+            ),
+            'openstack.conf',
+            use_sudo=True
+        )
 
 
 def configure_salt_cloud(salt_master_address, openstack_cloud_config):
@@ -62,7 +84,7 @@ def configure_salt_cloud(salt_master_address, openstack_cloud_config):
     Configure Salt Cloud on the salt master.
     :param salt_master_address: The public address of the salt master
     :param openstack_cloud_config: The openstack cloud configuration (StringIO).
-    :return:
+    :return: None
     """
     env.host_string = salt_master_address
     func = functools.partial(_configure_salt_cloud, openstack_cloud_config=openstack_cloud_config)
@@ -113,6 +135,29 @@ def accept_salt_minion_connections(salt_master_address, minion_connection_keys):
     """
     env.host_string = salt_master_address
     func = functools.partial(_accept_salt_minion_connections, minion_connection_keys=minion_connection_keys)
+    execute(func)
+
+
+def _write_salt_master_private_key(private_key):
+    """
+    Write the private key for the root user on the the salt master.
+    :param private_key: The private key to write.
+    :return: None
+    """
+    with cd('/root/.ssh'):
+        put(io.StringIO(private_key), 'id_rsa', mode=0o0600, use_sudo=True)
+        sudo('chown root. id_rsa')
+
+
+def write_salt_master_private_key(salt_master_address, private_key):
+    """
+    Write the private key for the root user on the the salt master.
+    :param salt_master_address: The public address of the salt master
+    :param private_key: The private key to write.
+    :return: None
+    """
+    env.host_string = salt_master_address
+    func = functools.partial(_write_salt_master_private_key, private_key=private_key)
     execute(func)
 
 

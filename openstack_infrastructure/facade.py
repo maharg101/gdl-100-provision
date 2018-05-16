@@ -298,6 +298,20 @@ class OpenStackFacade(object):
         if key_name:
             server_params['key_name'] = key_name
 
+    def get_or_create_key_pair(self, name):
+        """
+        Get or create a key pair with the given name.
+        :param name: The name of the key pair
+        :return: The key pair.
+        """
+        key_pair = self.conn.compute.find_keypair(name)
+        if not key_pair:
+            key_pair = self.conn.compute.create_keypair(name=name)
+            self.display('created new key pair %s' % key_pair)
+        else:
+            self.display('got existing key pair %s' % key_pair)
+        return key_pair
+
     # --------------------- Destroy methods ---------------------
 
     def delete_server(self, server_name, network_name):
