@@ -65,6 +65,7 @@ class InfrastructureManager(object):
         app_server_names = self.create_app_servers(network, port, subnet, servers, salt_master_address)
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
         fab_utils.apply_state(salt_master_address)
+        self.build_load_balancers()
         return servers
 
     def create_app_servers(self, network, port, subnet, servers, salt_master_address):
@@ -143,6 +144,14 @@ class InfrastructureManager(object):
         servers[server_name] = [x.floating_ip_address for x in public_ip_addresses]
         return public_ip_addresses
 
+    def build_load_balancers(self):
+        """
+        Build the load balancing servers and associated items.
+        Note that salt-cloud is used to build the instances themselves.
+        :return:
+        """
+        self.os_facade.get_or_create_vrrp_security_group()
+
     def destroy(self):
         """
         Perform the destroy steps in order.
@@ -150,11 +159,20 @@ class InfrastructureManager(object):
         :return:
         """
         self.prepare()
+        self.delete_load_balancers()
         self.delete_app_servers()
         self.delete_salt_server()
         self.os_facade.delete_subnet(self.params['subnet_name'], self.params['router_name'])
         self.os_facade.delete_network(self.params['network_name'])
         self.os_facade.delete_router(self.params['router_name'])
+
+    def delete_load_balancers(self):
+        """
+        Delete the load balancing servers and associated items.
+        Note that salt-cloud is used to destroy the instances themselves.
+        :return:
+        """
+        self.os_facade.delete_security_group('vrrp')
 
     def delete_app_servers(self):
         """

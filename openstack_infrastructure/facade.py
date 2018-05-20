@@ -252,7 +252,7 @@ class OpenStackFacade(object):
         )
         self.set_key_pair_name(server_params)
         server = self.conn.compute.create_server(**server_params)
-        self.conn.compute.wait_for_server(server, status='ACTIVE')
+        self.conn.compute.wait_for_server(server, status='ACTIVE', wait=300)
         self.assign_floating_ip(network, port, server, subnet)
         created_server = self.conn.compute.get_server(server.id)
         self.display('server %s created' % server_name, created_server)
@@ -311,6 +311,25 @@ class OpenStackFacade(object):
         else:
             self.display('got existing key pair %s' % key_pair)
         return key_pair
+
+    def get_or_create_vrrp_security_group(self):
+        """
+        Get or create the vrrp security group.
+        :return: The vrrp security group object.
+        """
+        vrrp_group = self.conn.network.find_security_group('vrrp')
+        if not vrrp_group:
+            vrrp_group = self.conn.network.create_security_group(name='vrrp', description='vrrp')
+            self.display('created new security group', vrrp_group)
+            vrrp_rule = self.conn.network.create_security_group_rule(
+                security_group_id=vrrp_group.id,
+                protocol=112,
+                direction='ingress'
+            )
+            self.display('created new security group rule', vrrp_rule)
+        else:
+            self.display('got existing security group', vrrp_group)
+        return vrrp_group
 
     # --------------------- Destroy methods ---------------------
 
@@ -447,6 +466,22 @@ class OpenStackFacade(object):
 
         self.display('deleting router %s' % router_name)
         self.conn.network.delete_router(router)
+
+    def delete_security_group(self, name):
+        """
+        Delete a security group.
+        :param name: The name of the security group to delete.
+        :return: None
+        """
+        group = self.conn.network.find_security_group(name)
+        if not group:
+            self.display('could not find security group %s' % name)
+            return
+
+        self.display('security group %s' % name, group)
+
+        self.display('deleting security group %s' % name)
+        self.conn.network.delete_security_group(group)
 
     # --------------------- Utility methods ---------------------
 
