@@ -77,6 +77,22 @@ def _configure_salt_cloud(openstack_cloud_config):
             'openstack.conf',
             use_sudo=True
         )
+    with cd('/root/'):
+        put(
+            io.StringIO(
+                yaml.dump(
+                    {
+                        'm1_small_ubuntu': {
+                            'vrrp-primary': {'security_groups': ['default', 'vrrp']},
+                            'vrrp-secondary': {'security_groups': ['default', 'vrrp']},
+                            'vrrp-management': {'security_groups': ['default', 'vrrp']},
+                        }
+                    }
+                )
+            ),
+            'vrrp-host-map',
+            use_sudo=True
+        )
 
 
 def configure_salt_cloud(salt_master_address, openstack_cloud_config):
