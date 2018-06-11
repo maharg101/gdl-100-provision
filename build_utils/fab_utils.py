@@ -194,3 +194,46 @@ def apply_state(salt_master_address):
     """
     env.host_string = salt_master_address
     execute(_apply_state)
+
+
+def _build_load_balancer_hosts():
+    """
+    Invoke salt-cloud to build the load balancer hosts.
+    :return: None
+    """
+    # -P runs in parallel, -y assumes yes
+    sudo('salt-cloud -m /root/vrrp-host-map -P -y')
+
+
+def build_load_balancer_hosts(salt_master_address):
+    """
+    Invoke salt-cloud to build the load balancer hosts.
+    :param salt_master_address:
+    :return: None
+    """
+    env.host_string = salt_master_address
+    execute(_build_load_balancer_hosts)
+
+
+def _destroy_load_balancer_hosts():
+    """
+    Invoke salt-cloud to destroy the load balancer hosts.
+    N.B.
+     - In practice this project uses the OpenStack SDK via facade.py in preference to this method.
+     - See delete_load_balancers method in build.py
+    :return: None
+    """
+    sudo('salt-cloud -m /root/vrrp-host-map -d -y')
+
+
+def destroy_load_balancer_hosts(salt_master_address):
+    """
+    Invoke salt-cloud to destroy the load balancer hosts.
+    N.B.
+     - In practice this project uses the OpenStack SDK via facade.py in preference to this method.
+     - See delete_load_balancers method in build.py
+    :param salt_master_address:
+    :return: None
+    """
+    env.host_string = salt_master_address
+    execute(_destroy_load_balancer_hosts)

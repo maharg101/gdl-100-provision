@@ -65,7 +65,7 @@ class InfrastructureManager(object):
         app_server_names = self.create_app_servers(network, port, subnet, servers, salt_master_address)
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
         fab_utils.apply_state(salt_master_address)
-        self.build_load_balancers()
+        self.build_load_balancers(salt_master_address)
         return servers
 
     def create_app_servers(self, network, port, subnet, servers, salt_master_address):
@@ -144,18 +144,19 @@ class InfrastructureManager(object):
         servers[server_name] = [x.floating_ip_address for x in public_ip_addresses]
         return public_ip_addresses
 
-    def build_load_balancers(self):
+    def build_load_balancers(self, salt_master_address):
         """
         Build the load balancing servers and associated items.
         Note that salt-cloud is used to build the instances themselves.
+        :param salt_master_address: The address of the salt master server.
         :return:
         """
         self.os_facade.get_or_create_vrrp_security_group()
+        fab_utils.build_load_balancer_hosts(salt_master_address)
 
     def destroy(self):
         """
         Perform the destroy steps in order.
-
         :return:
         """
         self.prepare()
@@ -169,9 +170,16 @@ class InfrastructureManager(object):
     def delete_load_balancers(self):
         """
         Delete the load balancing servers and associated items.
-        Note that salt-cloud is used to destroy the instances themselves.
+        Note that salt-cloud is NOT used to destroy the instances themselves - it is simpler at this point to
+        use the OpenStack SDK methods as exposed by facade.py. It is not obvious how the floating IP addresses are
+        freed up when using salt-cloud.
+        See destroy_load_balancer_hosts method in fab_utils for details of how it could work with salt-cloud.
         :return:
         """
+        self.os_facade.delete_server('vrrp-primary', self.params['network_name'])
+        self.os_facade.delete_server('vrrp-secondary', self.params['network_name'])
+        self.os_facade.delete_server('vrrp-management', self.params['network_name'])
+        self.os_facade.delete_key_pair('salt-cloud')
         self.os_facade.delete_security_group('vrrp')
 
     def delete_app_servers(self):

@@ -12,6 +12,7 @@ Related links:
 import os
 import ipaddress
 import pprint
+import time
 
 from openstack import connection, exceptions
 
@@ -357,7 +358,33 @@ class OpenStackFacade(object):
         self.delete_floating_ip(server, network_name)
 
         self.display('deleting server %s' % server_name)
-        self.conn.compute.delete_server(server)
+        self.conn.compute.delete_server(server, force=True)  # be on the safe side..
+        self.wait_for_server_to_vanish(server_name)
+
+    def wait_for_server_to_vanish(self, server_name, attempts=10, sleep_seconds=10):
+        """
+        Wait for a recently deleted server to actually go.
+        There can be a delay between the delete instruction, and the actual removal of the server from OpenStack.
+        Note that wait_for_server doesn't really work for this use case.
+        :param server_name: The name of the delete to inspect.
+        :param attempts: The number of attempts to make before giving up.
+        :param sleep_seconds: The number of seconds to sleep between attempts.
+        :return: None
+        """
+        for attempt in range(1, attempts+1):
+            self.display('waiting for server %s to vanish, attempt %s of %s' % (server_name, attempt, attempts))
+            try:
+                server = self.conn.compute.find_server(server_name)
+                if server:
+                    self.display('found server %s' % server_name, server)
+                    time.sleep(sleep_seconds)
+                else:
+                    self.display('could not find server %s' % server_name)
+                    return
+            except exceptions.InvalidRequest:
+                self.display('could not find server %s' % server_name)
+                return
+        self.display('giving up - server %s may still be present...' % server_name)
 
     def delete_floating_ip(self, server, network_name):
         """
@@ -482,6 +509,19 @@ class OpenStackFacade(object):
 
         self.display('deleting security group %s' % name)
         self.conn.network.delete_security_group(group)
+
+    def delete_key_pair(self, name):
+        """
+        Delete a key pair with the given name.
+        :param name: The name of the key pair
+        :return: None
+        """
+        key_pair = self.conn.compute.find_keypair(name)
+        if not key_pair:
+            self.display('could not find key pair %s' % key_pair)
+        else:
+            self.display('deleting key pair %s' % key_pair)
+            self.conn.compute.delete_keypair(name)
 
     # --------------------- Utility methods ---------------------
 
