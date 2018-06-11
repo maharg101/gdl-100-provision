@@ -366,7 +366,7 @@ class OpenStackFacade(object):
         Wait for a recently deleted server to actually go.
         There can be a delay between the delete instruction, and the actual removal of the server from OpenStack.
         Note that wait_for_server doesn't really work for this use case.
-        :param server_name: The name of the delete to inspect.
+        :param server_name: The name of the server to inspect.
         :param attempts: The number of attempts to make before giving up.
         :param sleep_seconds: The number of seconds to sleep between attempts.
         :return: None
