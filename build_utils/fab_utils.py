@@ -93,6 +93,20 @@ def _configure_salt_cloud(openstack_cloud_config):
             'vrrp-host-map',
             use_sudo=True
         )
+    with cd('/etc/salt'):
+        put(
+            io.StringIO(
+                yaml.dump(
+                    {
+                        'minion': {
+                            'master': env.host_string  # this ensures that minions can find the master
+                        }
+                    }
+                )
+            ),
+            'cloud',
+            use_sudo=True
+        )
 
 
 def configure_salt_cloud(salt_master_address, openstack_cloud_config):
@@ -201,8 +215,9 @@ def _build_load_balancer_hosts():
     Invoke salt-cloud to build the load balancer hosts.
     :return: None
     """
-    # -P runs in parallel, -y assumes yes
-    sudo('salt-cloud -m /root/vrrp-host-map -P -y')
+    # -P can be used to run in parallel - but can cause timeouts - see https://github.com/saltstack/salt/issues/46663
+    # -y assumes yes
+    sudo('salt-cloud -m /root/vrrp-host-map -y --out=highstate --state-output=terse')
 
 
 def build_load_balancer_hosts(salt_master_address):
