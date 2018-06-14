@@ -87,7 +87,8 @@ def _configure_salt_cloud(openstack_cloud_config):
                             'vrrp-secondary': {'security_groups': ['default', 'vrrp']},
                             'vrrp-management': {'security_groups': ['default', 'vrrp']},
                         }
-                    }
+                    },
+                    default_flow_style=False
                 )
             ),
             'vrrp-host-map',
@@ -101,7 +102,8 @@ def _configure_salt_cloud(openstack_cloud_config):
                         'minion': {
                             'master': env.host_string  # this ensures that minions can find the master
                         }
-                    }
+                    },
+                    default_flow_style=False
                 )
             ),
             'cloud',
@@ -118,6 +120,62 @@ def configure_salt_cloud(salt_master_address, openstack_cloud_config):
     """
     env.host_string = salt_master_address
     func = functools.partial(_configure_salt_cloud, openstack_cloud_config=openstack_cloud_config)
+    execute(func)
+
+
+def _place_ha_config_on_saltmaster(primary_server, primary_server_port, primary_ip, secondary_server,
+                                   secondary_server_port):
+    """
+    Place the high availability configuration files on the salt master.
+    See https://github.com/100PercentIT/OpenStack-HA-Keepalived
+    :param primary_server: The primary HA server
+    :param primary_server_port: The primary HA server port
+    :param primary_ip: The IP address of the primary server
+    :param secondary_server: The secondary HA server
+    :param secondary_server_port: The secondary HA server port
+    :return: None
+    """
+    with cd('/srv/salt/keepalived'):
+
+        put(io.StringIO("""\
+#!/bin/bash
+# failover-primary-to-secondary.sh
+neutron --os-cloud 100percentit floatingip-disassociate %s %s
+neutron --os-cloud 100percentit floatingip-associate %s %s
+""" % (primary_ip.id, primary_server_port.id, primary_ip.id, secondary_server_port.id)),
+            'failover-primary-to-secondary.sh', use_sudo=True)
+
+        put(io.StringIO("""\
+#!/bin/bash
+# failover-secondary-to-primary.sh
+neutron --os-cloud 100percentit floatingip-disassociate %s %s
+neutron --os-cloud 100percentit floatingip-associate %s %s
+""" % (primary_ip.id, secondary_server_port.id, primary_ip.id, primary_server_port.id)),
+            'failover-secondary-to-primary.sh', use_sudo=True)
+
+
+def place_ha_config_on_saltmaster(salt_master_address, primary_server, primary_server_port, primary_ip,
+                                          secondary_server, secondary_server_port):
+    """
+    Place the high availability configuration files on the salt master.
+    See https://github.com/100PercentIT/OpenStack-HA-Keepalived
+    :param salt_master_address: The public address of the salt master
+    :param primary_server: The primary HA server
+    :param primary_server_port: The primary HA server port
+    :param primary_ip: The IP address of the primary server
+    :param secondary_server: The secondary HA server
+    :param secondary_server_port: The secondary HA server port
+    :return: None
+    """
+    env.host_string = salt_master_address
+    func = functools.partial(
+        _place_ha_config_on_saltmaster,
+        primary_server=primary_server,
+        primary_server_port=primary_server_port,
+        primary_ip=primary_ip,
+        secondary_server=secondary_server,
+        secondary_server_port=secondary_server_port,
+    )
     execute(func)
 
 

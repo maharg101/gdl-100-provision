@@ -200,6 +200,15 @@ class OpenStackFacade(object):
         self.display('port created', port)
         return port
 
+    def get_ports_for_server(self, server):
+        """
+        Returns a list of ports for a given server.
+        :param server: The server for which to return ports
+        :return: A list of ports.
+        """
+        ports = self.conn.network.ports(device_id=server.id)
+        return ports
+
     def add_interface_to_router(self, router, subnet, port):
         """
         Add an interface to the given router, for the specified subnet and port.
