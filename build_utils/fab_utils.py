@@ -123,7 +123,7 @@ def configure_salt_cloud(salt_master_address, openstack_cloud_config):
 
 def _bootstrap_salt_minion(salt_master_address):
     """
-    Bootstrap a salt minion
+    Bootstrap a salt minion, ensuring to configure the salt master location.
     :param salt_master_address: The public address of the salt master
     :return: None
     """
@@ -131,6 +131,9 @@ def _bootstrap_salt_minion(salt_master_address):
         with cd('/tmp'):
             run('curl -L https://bootstrap.saltstack.com -o install_salt.sh')
             sudo('sh install_salt.sh -A %s' % salt_master_address)
+    with cd('/etc/salt'):
+        put(io.StringIO('master: %s' % salt_master_address), 'minion', use_sudo=True)
+    sudo('systemctl restart salt-minion')
 
 
 def bootstrap_salt_minion(salt_minion_address, salt_master_address):
