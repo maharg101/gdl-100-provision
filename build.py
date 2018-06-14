@@ -64,8 +64,8 @@ class InfrastructureManager(object):
         salt_master_address = self.create_salt_server(network, port, subnet, servers)
         app_server_names = self.create_app_servers(network, port, subnet, servers, salt_master_address)
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
-        fab_utils.apply_state(salt_master_address)
         self.build_load_balancers(salt_master_address)
+        fab_utils.apply_state(salt_master_address)
         return servers
 
     def create_app_servers(self, network, port, subnet, servers, salt_master_address):
