@@ -52,7 +52,7 @@ class InfrastructureManager(object):
         """
         Perform the build steps in order.
 
-        :return: OrderedDict containing 'server_name': [public_ip_addresses]
+        :return: OrderedDict containing 'server_name': [public_ip_addresses], String containing HA address
         """
         self.prepare()
         router = self.os_facade.find_or_create_router(self.params['router_name'])
@@ -66,7 +66,8 @@ class InfrastructureManager(object):
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
         self.build_load_balancers(salt_master_address)
         fab_utils.apply_state(salt_master_address)
-        return servers
+        ha_address = self.configure_keepalived(network, port, subnet, salt_master_address)
+        return servers, ha_address
 
     def create_app_servers(self, network, port, subnet, servers, salt_master_address):
         """
@@ -117,7 +118,7 @@ class InfrastructureManager(object):
         a 'private_key' entry. This private key is then written as the root user private key on the salt master.
         On subsequent runs, the key is already in place. This works because openstack only returns the private key
         when the key pair is generated.
-        :param salt_master_address:
+        :param salt_master_address: The address of the salt master server
         :return: None
         """
         key_pair = self.os_facade.get_or_create_key_pair('salt-cloud')
@@ -146,14 +147,39 @@ class InfrastructureManager(object):
 
     def build_load_balancers(self, salt_master_address):
         """
-        Build the load balancing servers and associated items.
-        Note that salt-cloud is used to build the instances themselves.
-        :param salt_master_address: The address of the salt master server.
+        Build the load balancing instances using salt-cloud.
+        :param salt_master_address: The address of the salt master server
         :return:
         """
         self.os_facade.get_or_create_vrrp_security_group()
         fab_utils.build_load_balancer_hosts(salt_master_address)
 
+    def configure_keepalived(self, network, port, subnet, salt_master_address):
+        """
+        Configure highly available keepalived as described at https://github.com/100PercentIT/OpenStack-HA-Keepalived
+        The two instances have been created with floating IP addresses assigned, we'll reuse the primary one.
+        :param network: The network to which the server is connected
+        :param port: The port to which all of the floating IP addresses are attached to
+        :param subnet: The subnet on which the floating IP addresses are created
+        :param salt_master_address: The address of the salt master server
+        :return: String containing the highly available IP address
+        """
+        # primary server details
+        primary_server = self.os_facade.find_or_create_server('vrrp-primary', network, subnet, port)
+        primary_server_port = next(self.os_facade.get_ports_for_server(primary_server), None)  # just one
+
+        # primary server floating IP
+        primary_ip = self.os_facade.get_public_addresses(primary_server, self.params['network_name'])[0]
+
+        # secondary server details
+        secondary_server = self.os_facade.find_or_create_server('vrrp-secondary', network, subnet, port)
+        secondary_server_port = next(self.os_facade.get_ports_for_server(secondary_server), None)  # just one
+
+        fab_utils.place_ha_config_on_saltmaster(salt_master_address, primary_server, primary_server_port, primary_ip,
+                                                secondary_server, secondary_server_port)
+
+        return primary_ip.floating_ip_address
+        
     def destroy(self):
         """
         Perform the destroy steps in order.
@@ -234,9 +260,10 @@ def main():
         manager.destroy()
     else:
         print('building...')
-        servers = manager.build()
+        servers, ha_address = manager.build()
         for server_name, public_ip_addresses in servers.items():
             print('server %s public IP address : %s' % (server_name, ','.join(public_ip_addresses)))
+        print('blog is now available at %s' % ha_address)
 
 
 if __name__ == '__main__':
