@@ -136,22 +136,68 @@ def _place_ha_config_on_saltmaster(primary_server, primary_server_port, primary_
     :return: None
     """
     with cd('/srv/salt/keepalived'):
+        _place_failover_primary_to_secondary_sh(primary_ip, primary_server_port, secondary_server_port)
+        _place_failover_secondary_to_primary_sh(primary_ip, primary_server_port, secondary_server_port)
+        _place_primary_keepalived_conf()
+        _place_secondary_keepalived_conf()
 
-        put(io.StringIO("""\
-#!/bin/bash
-# failover-primary-to-secondary.sh
-neutron --os-cloud 100percentit floatingip-disassociate %s %s
-neutron --os-cloud 100percentit floatingip-associate %s %s
-""" % (primary_ip.id, primary_server_port.id, primary_ip.id, secondary_server_port.id)),
-            'failover-primary-to-secondary.sh', use_sudo=True)
 
-        put(io.StringIO("""\
+def _place_secondary_keepalived_conf():
+    # TODO - don't assume ens3
+    put(io.StringIO("""\
+vrrp_instance vrrp_group_1 {
+state BACKUP
+interface ens3
+virtual_router_id 1
+priority 50
+preempt_delay 30
+authentication {
+auth_type PASS
+auth_pass sygco67atckysjhgcao76dt
+}
+notify_master /etc/keepalived/failover-primary-to-secondary.sh
+}     
+"""),
+        'secondary-keepalived.conf', use_sudo=True)
+
+
+def _place_primary_keepalived_conf():
+    # TODO - don't assume ens3
+    put(io.StringIO("""\
+vrrp_instance vrrp_group_1 {
+state MASTER
+interface ens3
+virtual_router_id 1
+priority 100
+preempt_delay 30
+authentication {
+auth_type PASS
+auth_pass sygco67atckysjhgcao76dt
+}
+notify_master /etc/keepalived/failover-secondary-to-primary.sh
+}        
+"""),
+        'primary-keepalived.conf', use_sudo=True)
+
+
+def _place_failover_secondary_to_primary_sh(primary_ip, primary_server_port, secondary_server_port):
+    put(io.StringIO("""\
 #!/bin/bash
 # failover-secondary-to-primary.sh
 neutron --os-cloud 100percentit floatingip-disassociate %s %s
 neutron --os-cloud 100percentit floatingip-associate %s %s
 """ % (primary_ip.id, secondary_server_port.id, primary_ip.id, primary_server_port.id)),
-            'failover-secondary-to-primary.sh', use_sudo=True)
+        'failover-secondary-to-primary.sh', use_sudo=True)
+
+
+def _place_failover_primary_to_secondary_sh(primary_ip, primary_server_port, secondary_server_port):
+    put(io.StringIO("""\
+#!/bin/bash
+# failover-primary-to-secondary.sh
+neutron --os-cloud 100percentit floatingip-disassociate %s %s
+neutron --os-cloud 100percentit floatingip-associate %s %s
+""" % (primary_ip.id, primary_server_port.id, primary_ip.id, secondary_server_port.id)),
+        'failover-primary-to-secondary.sh', use_sudo=True)
 
 
 def place_ha_config_on_saltmaster(salt_master_address, primary_server, primary_server_port, primary_ip,
