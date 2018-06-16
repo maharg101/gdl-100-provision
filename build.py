@@ -65,8 +65,8 @@ class InfrastructureManager(object):
         app_server_names = self.create_app_servers(network, port, subnet, servers, salt_master_address)
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
         self.build_load_balancers(salt_master_address)
-        fab_utils.apply_state(salt_master_address)
         ha_address = self.configure_keepalived(network, port, subnet, salt_master_address)
+        fab_utils.apply_state(salt_master_address)
         return servers, ha_address
 
     def create_app_servers(self, network, port, subnet, servers, salt_master_address):
@@ -164,22 +164,49 @@ class InfrastructureManager(object):
         :param salt_master_address: The address of the salt master server
         :return: String containing the highly available IP address
         """
-        # primary server details
         primary_server = self.os_facade.find_or_create_server('vrrp-primary', network, subnet, port)
         primary_server_port = next(self.os_facade.get_ports_for_server(primary_server), None)  # just one
 
-        # primary server floating IP
-        primary_ip = self.os_facade.get_public_addresses(primary_server, self.params['network_name'])[0]
-
-        # secondary server details
         secondary_server = self.os_facade.find_or_create_server('vrrp-secondary', network, subnet, port)
         secondary_server_port = next(self.os_facade.get_ports_for_server(secondary_server), None)  # just one
 
-        fab_utils.place_ha_config_on_saltmaster(salt_master_address, primary_server_port, primary_ip,
-                                                secondary_server_port)
+        ha_floating_ip = self.get_ha_floating_ip_address(network, port, subnet, primary_server, secondary_server)
 
-        return primary_ip.floating_ip_address
-        
+        fab_utils.place_ha_config_on_saltmaster(salt_master_address, primary_server_port, ha_floating_ip,
+                                                secondary_server_port)
+        return ha_floating_ip.floating_ip_address
+
+    def get_ha_floating_ip_address(self, network, port, subnet, primary_server, secondary_server):
+        """
+        Get a floating IP address to use for high availability.
+
+        The instances must have at least one floating IP at all times in order to be able to reach the openstack APIs.
+
+        At run time there may be an existing HA floating IP assigned to either primary or secondary.
+        Alternatively, on the first run, both servers will have only a single floating IP address.
+
+        TODO - is there a way to route API requests that doesn't require a floating IP ?
+
+        :param network: The network to which the servers are connected
+        :param port: The port to which all of the floating IP addresses are attached to
+        :param subnet: The subnet on which the floating IP addresses are created
+        :param primary_server: The primary vrrp instance
+        :param secondary_server: The secondary vrrp instance
+        :return:
+        """
+
+        primary_addresses = self.os_facade.get_public_addresses(primary_server, self.params['network_name'])
+        secondary_addresses = self.os_facade.get_public_addresses(secondary_server, self.params['network_name'])
+        if len(primary_addresses) > 1:
+            # re-use the second address which the primary server already has
+            ha_floating_ip = primary_addresses[1]
+        elif len(secondary_addresses) > 1:
+            # re-use the second address which the secondary server already has
+            ha_floating_ip = secondary_addresses[1]
+        else:
+            ha_floating_ip = self.os_facade.assign_floating_ip(network, port, primary_server, subnet)
+        return ha_floating_ip
+
     def destroy(self):
         """
         Perform the destroy steps in order.

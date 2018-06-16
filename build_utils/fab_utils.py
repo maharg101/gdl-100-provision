@@ -33,7 +33,8 @@ def _bootstrap_salt_master():
     with settings(warn_only=True):
         with cd(salt_dir):
             if run('git rev-parse --git-dir > /dev/null 2>&1').failed:
-                sudo('git clone https://github.com/maharg101/gdl-100-salt %s' % salt_dir)
+                sudo('git clone '
+                     'https://github.com/maharg101/gdl-100-salt %s' % salt_dir)
     with settings(warn_only=False):
         with cd(salt_dir):
             sudo('git pull')
@@ -127,7 +128,7 @@ def configure_salt_cloud(salt_master_address, openstack_cloud_config):
     execute(func)
 
 
-def _place_ha_config_on_saltmaster(primary_server_port, primary_ip, secondary_server_port):
+def _place_ha_config_on_saltmaster(primary_server_port, ha_floating_ip, secondary_server_port):
     """
     Place the high availability configuration files on the salt master.
     See https://github.com/100PercentIT/OpenStack-HA-Keepalived
@@ -137,8 +138,8 @@ def _place_ha_config_on_saltmaster(primary_server_port, primary_ip, secondary_se
     :return: None
     """
     with cd('/srv/salt/keepalived'):
-        _place_failover_primary_to_secondary_sh(primary_ip, primary_server_port, secondary_server_port)
-        _place_failover_secondary_to_primary_sh(primary_ip, primary_server_port, secondary_server_port)
+        _place_failover_primary_to_secondary_sh(ha_floating_ip, primary_server_port, secondary_server_port)
+        _place_failover_secondary_to_primary_sh(ha_floating_ip, primary_server_port, secondary_server_port)
         _place_primary_keepalived_conf()
         _place_secondary_keepalived_conf()
         _place_clouds_yaml()
@@ -199,33 +200,33 @@ notify_master /etc/keepalived/failover-secondary-to-primary.sh
         'primary-keepalived.conf', use_sudo=True)
 
 
-def _place_failover_secondary_to_primary_sh(primary_ip, primary_server_port, secondary_server_port):
+def _place_failover_secondary_to_primary_sh(ha_floating_ip, primary_server_port, secondary_server_port):
     put(io.StringIO("""\
 #!/bin/bash
 # failover-secondary-to-primary.sh
 neutron --os-cloud 100percentit floatingip-disassociate %s %s
 neutron --os-cloud 100percentit floatingip-associate %s %s
-""" % (primary_ip.id, secondary_server_port.id, primary_ip.id, primary_server_port.id)),
+""" % (ha_floating_ip.id, secondary_server_port.id, ha_floating_ip.id, primary_server_port.id)),
         'failover-secondary-to-primary.sh', use_sudo=True)
 
 
-def _place_failover_primary_to_secondary_sh(primary_ip, primary_server_port, secondary_server_port):
+def _place_failover_primary_to_secondary_sh(ha_floating_ip, primary_server_port, secondary_server_port):
     put(io.StringIO("""\
 #!/bin/bash
 # failover-primary-to-secondary.sh
 neutron --os-cloud 100percentit floatingip-disassociate %s %s
 neutron --os-cloud 100percentit floatingip-associate %s %s
-""" % (primary_ip.id, primary_server_port.id, primary_ip.id, secondary_server_port.id)),
+""" % (ha_floating_ip.id, primary_server_port.id, ha_floating_ip.id, secondary_server_port.id)),
         'failover-primary-to-secondary.sh', use_sudo=True)
 
 
-def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, primary_ip, secondary_server_port):
+def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, ha_floating_ip, secondary_server_port):
     """
     Place the high availability configuration files on the salt master.
     See https://github.com/100PercentIT/OpenStack-HA-Keepalived
     :param salt_master_address: The public address of the salt master
     :param primary_server_port: The primary HA server port
-    :param primary_ip: The IP address of the primary server
+    :param ha_floating_ip: The high availability floating IP
     :param secondary_server_port: The secondary HA server port
     :return: None
     """
@@ -233,7 +234,7 @@ def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, prim
     func = functools.partial(
         _place_ha_config_on_saltmaster,
         primary_server_port=primary_server_port,
-        primary_ip=primary_ip,
+        ha_floating_ip=ha_floating_ip,
         secondary_server_port=secondary_server_port,
     )
     execute(func)
