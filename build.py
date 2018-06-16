@@ -175,8 +175,8 @@ class InfrastructureManager(object):
         secondary_server = self.os_facade.find_or_create_server('vrrp-secondary', network, subnet, port)
         secondary_server_port = next(self.os_facade.get_ports_for_server(secondary_server), None)  # just one
 
-        fab_utils.place_ha_config_on_saltmaster(salt_master_address, primary_server, primary_server_port, primary_ip,
-                                                secondary_server, secondary_server_port)
+        fab_utils.place_ha_config_on_saltmaster(salt_master_address, primary_server_port, primary_ip,
+                                                secondary_server_port)
 
         return primary_ip.floating_ip_address
         
@@ -204,7 +204,6 @@ class InfrastructureManager(object):
         """
         self.os_facade.delete_server('vrrp-primary', self.params['network_name'])
         self.os_facade.delete_server('vrrp-secondary', self.params['network_name'])
-        self.os_facade.delete_server('vrrp-management', self.params['network_name'])
         self.os_facade.delete_key_pair('salt-cloud')
         self.os_facade.delete_security_group('vrrp')
 

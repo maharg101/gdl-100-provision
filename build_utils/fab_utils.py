@@ -8,6 +8,9 @@ Written by:  maharg101 on 25th February 2018
 
 import functools
 import io
+import os
+import random
+import string
 import yaml
 
 from fabric.api import *
@@ -17,6 +20,8 @@ env.connection_attempts = 5
 env.disable_known_hosts = True  # http://docs.fabfile.org/en/1.14/usage/ssh.html
 env.timeout = 30
 env.user = 'ubuntu'
+
+vrrp_auth_pass = "".join(random.choice(string.ascii_letters) for x in range(24))
 
 
 def _bootstrap_salt_master():
@@ -85,7 +90,6 @@ def _configure_salt_cloud(openstack_cloud_config):
                         'm1_small_ubuntu': {
                             'vrrp-primary': {'security_groups': ['default', 'vrrp']},
                             'vrrp-secondary': {'security_groups': ['default', 'vrrp']},
-                            'vrrp-management': {'security_groups': ['default', 'vrrp']},
                         }
                     },
                     default_flow_style=False
@@ -123,15 +127,12 @@ def configure_salt_cloud(salt_master_address, openstack_cloud_config):
     execute(func)
 
 
-def _place_ha_config_on_saltmaster(primary_server, primary_server_port, primary_ip, secondary_server,
-                                   secondary_server_port):
+def _place_ha_config_on_saltmaster(primary_server_port, primary_ip, secondary_server_port):
     """
     Place the high availability configuration files on the salt master.
     See https://github.com/100PercentIT/OpenStack-HA-Keepalived
-    :param primary_server: The primary HA server
     :param primary_server_port: The primary HA server port
     :param primary_ip: The IP address of the primary server
-    :param secondary_server: The secondary HA server
     :param secondary_server_port: The secondary HA server port
     :return: None
     """
@@ -140,6 +141,24 @@ def _place_ha_config_on_saltmaster(primary_server, primary_server_port, primary_
         _place_failover_secondary_to_primary_sh(primary_ip, primary_server_port, secondary_server_port)
         _place_primary_keepalived_conf()
         _place_secondary_keepalived_conf()
+        _place_clouds_yaml()
+
+
+def _place_clouds_yaml():
+    put(io.StringIO("""\
+clouds:
+  100percentit:
+    auth:
+      auth_url: https://cloud.100percentit.com:5000/v3
+      project_domain_name: default
+      user_domain_name: default
+      project_id: %(OS_PROJECT_ID)s
+      username: %(OS_USERNAME)s
+      password: %(OS_PASSWORD)s
+    region_name: RegionOne
+    interface: internal
+""" % os.environ),
+        'clouds.yaml', use_sudo=True)
 
 
 def _place_secondary_keepalived_conf():
@@ -153,11 +172,11 @@ priority 50
 preempt_delay 30
 authentication {
 auth_type PASS
-auth_pass sygco67atckysjhgcao76dt
+auth_pass %s
 }
 notify_master /etc/keepalived/failover-primary-to-secondary.sh
 }     
-"""),
+""" % vrrp_auth_pass),
         'secondary-keepalived.conf', use_sudo=True)
 
 
@@ -172,11 +191,11 @@ priority 100
 preempt_delay 30
 authentication {
 auth_type PASS
-auth_pass sygco67atckysjhgcao76dt
+auth_pass %s
 }
 notify_master /etc/keepalived/failover-secondary-to-primary.sh
 }        
-"""),
+""" % vrrp_auth_pass),
         'primary-keepalived.conf', use_sudo=True)
 
 
@@ -200,26 +219,21 @@ neutron --os-cloud 100percentit floatingip-associate %s %s
         'failover-primary-to-secondary.sh', use_sudo=True)
 
 
-def place_ha_config_on_saltmaster(salt_master_address, primary_server, primary_server_port, primary_ip,
-                                          secondary_server, secondary_server_port):
+def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, primary_ip, secondary_server_port):
     """
     Place the high availability configuration files on the salt master.
     See https://github.com/100PercentIT/OpenStack-HA-Keepalived
     :param salt_master_address: The public address of the salt master
-    :param primary_server: The primary HA server
     :param primary_server_port: The primary HA server port
     :param primary_ip: The IP address of the primary server
-    :param secondary_server: The secondary HA server
     :param secondary_server_port: The secondary HA server port
     :return: None
     """
     env.host_string = salt_master_address
     func = functools.partial(
         _place_ha_config_on_saltmaster,
-        primary_server=primary_server,
         primary_server_port=primary_server_port,
         primary_ip=primary_ip,
-        secondary_server=secondary_server,
         secondary_server_port=secondary_server_port,
     )
     execute(func)
