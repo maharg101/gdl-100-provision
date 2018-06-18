@@ -153,6 +153,7 @@ class InfrastructureManager(object):
         :return:
         """
         self.os_facade.get_or_create_vrrp_security_group()
+        self.os_facade.get_or_create_http_security_group()
         fab_utils.build_load_balancer_hosts(salt_master_address)
 
     def configure_keepalived(self, network, port, subnet, salt_master_address):
@@ -233,6 +234,7 @@ class InfrastructureManager(object):
         self.os_facade.delete_server('vrrp-primary', self.params['network_name'])
         self.os_facade.delete_server('vrrp-secondary', self.params['network_name'])
         self.os_facade.delete_key_pair('salt-cloud')
+        self.os_facade.delete_security_group('http')
         self.os_facade.delete_security_group('vrrp')
 
     def delete_app_servers(self):

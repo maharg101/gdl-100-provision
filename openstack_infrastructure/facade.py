@@ -341,6 +341,27 @@ class OpenStackFacade(object):
             self.display('got existing security group', vrrp_group)
         return vrrp_group
 
+    def get_or_create_http_security_group(self):
+        """
+        Get or create the http security group.
+        :return: The http security group object.
+        """
+        http_group = self.conn.network.find_security_group('http')
+        if not http_group:
+            http_group = self.conn.network.create_security_group(name='http', description='http')
+            self.display('created new security group', http_group)
+            http_rule = self.conn.network.create_security_group_rule(
+                security_group_id=http_group.id,
+                protocol='TCP',
+                port_range_min=80,
+                port_range_max=80,
+                direction='ingress'
+            )
+            self.display('created new security group rule', http_rule)
+        else:
+            self.display('got existing security group', http_group)
+        return http_group
+
     # --------------------- Destroy methods ---------------------
 
     def delete_server(self, server_name, network_name):
