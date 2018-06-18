@@ -89,8 +89,8 @@ def _configure_salt_cloud(openstack_cloud_config):
                 yaml.dump(
                     {
                         'm1_small_ubuntu': {
-                            'vrrp-primary': {'security_groups': ['default', 'vrrp']},
-                            'vrrp-secondary': {'security_groups': ['default', 'vrrp']},
+                            'vrrp-primary': {'security_groups': ['default', 'vrrp', 'http']},
+                            'vrrp-secondary': {'security_groups': ['default', 'vrrp', 'http']},
                         }
                     },
                     default_flow_style=False
