@@ -223,6 +223,7 @@ neutron --os-cloud 100percentit floatingip-associate %s %s
 def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, ha_floating_ip, secondary_server_port):
     """
     Place the high availability configuration files on the salt master.
+    As these are small files, they are constructed in full before being placed.
     See https://github.com/100PercentIT/OpenStack-HA-Keepalived
     :param salt_master_address: The public address of the salt master
     :param primary_server_port: The primary HA server port
@@ -236,6 +237,49 @@ def place_ha_config_on_saltmaster(salt_master_address, primary_server_port, ha_f
         primary_server_port=primary_server_port,
         ha_floating_ip=ha_floating_ip,
         secondary_server_port=secondary_server_port,
+    )
+    execute(func)
+
+
+def _place_haproxy_pillar_on_saltmaster(servers, app_server_prefix):
+    """
+    Place the haproxy pillar data on the salt master.
+    :param servers: A dict of server name to floating IP address
+    :param app_server_prefix: The prefix used for application servers
+    :return: None
+    """
+    with cd('/srv/pillar'):
+        put(
+            io.StringIO(
+                yaml.dump(
+                    dict(
+                        backend_servers={
+                            # although app servers may have more than one floating ip address, the servers dict
+                            # will only have their 'primary' floating ip address hence v[0]
+                            k: dict(ip_address=v[0]) for (k, v) in servers.items() if k.startswith(app_server_prefix)
+                        }
+                    ),
+                    default_flow_style=False
+                )
+            ),
+            'haproxy.sls',
+            use_sudo=True
+        )
+
+
+def place_haproxy_pillar_on_saltmaster(salt_master_address, servers, app_server_prefix):
+    """
+    Place the haproxy pillar data on the salt master.
+    :param salt_master_address: The public address of the salt master
+    :param servers: A dict of server name to floating IP address
+    :param app_server_prefix: The prefix used for application servers
+    :return: None
+    """
+    env.host_string = salt_master_address
+    func = functools.partial(
+        _place_haproxy_pillar_on_saltmaster,
+        servers=servers,
+        app_server_prefix=app_server_prefix,
     )
     execute(func)
 

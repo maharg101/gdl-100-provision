@@ -66,6 +66,7 @@ class InfrastructureManager(object):
         fab_utils.accept_salt_minion_connections(salt_master_address, app_server_names)
         self.build_load_balancers(salt_master_address)
         ha_address = self.configure_keepalived(network, port, subnet, salt_master_address)
+        fab_utils.place_haproxy_pillar_on_saltmaster(salt_master_address, servers, APP_SERVER_PREFIX)
         fab_utils.apply_state(salt_master_address)
         return servers, ha_address
 
